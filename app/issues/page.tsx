@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getFilteredIssues, updateIssueStatus, IssueFilterState } from './issueService';
 
-// Interfaces adaptadas a las que genera tu issueService
 interface IssueField {
     name: string;
     color?: string;
@@ -14,10 +13,10 @@ interface Issue {
     id: number;
     subject: string;
     description: string | null;
-    type: IssueField | null;       // Objeto con name y color generado por tu servicio
-    severity: IssueField | null;   // Objeto con name y color generado por tu servicio
+    type: IssueField | null;
+    severity: IssueField | null;
     priority: string | null;
-    status: IssueField | null;     // Objeto con name y color generado por tu servicio
+    status: IssueField | null;
     assignee: string | null;
     deadline: string | null;
     modified_at: string | null;
@@ -35,7 +34,6 @@ export default function IssuesPage() {
     const [showFilters, setShowFilters] = useState<boolean>(true);
     const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
-    // Contadores del Backend
     const [typeCounts, setTypeCounts] = useState<BackendCounts>({});
     const [severityCounts, setSeverityCounts] = useState<BackendCounts>({});
     const [priorityCounts, setPriorityCounts] = useState<BackendCounts>({});
@@ -53,27 +51,60 @@ export default function IssuesPage() {
         assigned_to: []
     });
 
-    // Tu API Key única y fija obligatoria
     const apiKey = "Mxk4bUdzGtId8imUNgVKHUiheNKT4AKl";
 
-    const typeDependency = JSON.stringify(filters.issue_type);
-    const severityDependency = JSON.stringify(filters.issue_severity);
-    const priorityDependency = JSON.stringify(filters.priority);
-    const statusDependency = JSON.stringify(filters.status);
+    const handleSort = (field: string) => {
+        setFilters(prev => {
+            const nextOrder = prev.order_by === field ? `-${field}` : field;
+            return { ...prev, order_by: nextOrder };
+        });
+    };
+
+    const renderSortIcon = (field: string) => {
+        const isCurrent = filters.order_by.replace('-', '') === field;
+        const isDescending = filters.order_by.startsWith('-');
+
+        return (
+            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', marginLeft: '6px', lineHeight: '0.6' }}>
+                <span style={{ fontSize: '9px', color: isCurrent && !isDescending ? '#34495e' : '#cbd5e1', marginBottom: '1px' }}>▲</span>
+                <span style={{ fontSize: '9px', color: isCurrent && isDescending ? '#34495e' : '#cbd5e1' }}>▼</span>
+            </div>
+        );
+    };
+
+    const filtersString = JSON.stringify({
+        search: filters.search,
+        order_by: filters.order_by,
+        issue_type: filters.issue_type,
+        issue_severity: filters.issue_severity,
+        priority: filters.priority,
+        status: filters.status,
+        assigned_to: filters.assigned_to
+    });
 
     useEffect(() => {
         let isMounted = true;
         const loadIssues = async () => {
             setLoading(true);
             try {
-                const data = await getFilteredIssues(filters, apiKey);
+                const currentFilters = JSON.parse(filtersString) as IssueFilterState;
+                const data = await getFilteredIssues(currentFilters, apiKey);
                 if (isMounted) {
-                    setIssues(data.issues || []);
+                    // Normalización del objeto status para evitar errores de tipo en TypeScript
+                    const normalizedIssues = (data.issues || []).map((issue: any) => ({
+                        ...issue,
+                        status: typeof issue.status === 'string'
+                            ? { name: issue.status }
+                            : (issue.status || { name: 'In Progress' })
+                    }));
+
+                    setIssues(normalizedIssues);
                     setTotalCount(data.total_count || 0);
 
                     setTypeCounts(data.type_counts || {});
                     setSeverityCounts(data.severity_counts || {});
                     setStatusCounts(data.status_counts || {});
+                    setPriorityCounts(data.priority_counts || {});
 
                     setError(null);
                 }
@@ -85,7 +116,7 @@ export default function IssuesPage() {
         };
         loadIssues();
         return () => { isMounted = false; };
-    }, [filters.search, filters.order_by, typeDependency, severityDependency, priorityDependency, statusDependency, refreshTrigger]);
+    }, [filtersString, refreshTrigger]);
 
     const handleCheckboxChange = (category: keyof Omit<IssueFilterState, 'search' | 'order_by'>, value: string) => {
         setFilters(prev => {
@@ -99,17 +130,6 @@ export default function IssuesPage() {
 
     const handleInlineStatusChange = (issueId: number, value: string) => {
         setLocalStatusChanges(prev => ({ ...prev, [issueId]: value }));
-        setIssues(prevIssues =>
-            prevIssues.map(issue => {
-                if (issue.id === issueId) {
-                    return {
-                        ...issue,
-                        status: issue.status ? { ...issue.status, name: value } : { name: value }
-                    };
-                }
-                return issue;
-            })
-        );
     };
 
     const handleSaveStatus = async (issueId: number, currentStatus: IssueField | null) => {
@@ -132,35 +152,22 @@ export default function IssuesPage() {
         if (!dateStr) return 'No date';
         const date = new Date(dateStr);
         if (isNaN(date.getTime())) return dateStr;
-        return date.toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-        });
+        return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     };
 
-    // --- SE EXTRAEN LOS COLORES QUE TU SERVICIO YA CORRIGIÓ ---
-    const getTypeColor = (type: IssueField | null) => {
-        return type?.color || '#cbd5e1';
-    };
-
-    const getSeverityColor = (sev: IssueField | null) => {
-        return sev?.color || '#cbd5e1';
-    };
-
+    const getTypeColor = (type: IssueField | null) => type?.color || '#cbd5e1';
+    const getSeverityColor = (sev: IssueField | null) => sev?.color || '#cbd5e1';
     const getPriorityColor = (prio: string | null) => {
         if (!prio) return '#70728F';
         const clean = prio.toLowerCase().trim();
         if (clean === 'high' || clean === '3') return '#E44057';
         if (clean === 'normal' || clean === '2') return '#E4A840';
-        return '#70728F'; // Low
+        return '#70728F';
     };
 
     const getCountSafe = (countsObj: BackendCounts, key: string) => {
         if (!countsObj) return 0;
-        if (countsObj[key] !== undefined) return countsObj[key];
-        if (countsObj[key.toLowerCase()] !== undefined) return countsObj[key.toLowerCase()];
-        return 0;
+        return countsObj[key] !== undefined ? countsObj[key] : (countsObj[key.toLowerCase()] !== undefined ? countsObj[key.toLowerCase()] : 0);
     };
 
     return (
@@ -281,72 +288,108 @@ export default function IssuesPage() {
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
                                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-                                    <th style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '60px', textAlign: 'center' }}>TYPE</th>
-                                    <th style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '60px', textAlign: 'center' }}>SEV.</th>
-                                    <th style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '60px', textAlign: 'center' }}>PRIO.</th>
-                                    <th style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', textAlign: 'left' }}>ISSUE</th>
-                                    <th style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '160px', textAlign: 'left' }}>STATUS</th>
-                                    <th style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '180px', textAlign: 'left' }}>ASSIGNED TO</th>
-                                    <th style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '120px', textAlign: 'left' }}>DEADLINE</th>
-                                    <th style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '120px', textAlign: 'left' }}>MODIFIED</th>
+                                    <th onClick={() => handleSort('issue_type')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <span>TYPE</span>{renderSortIcon('issue_type')}
+                                        </div>
+                                    </th>
+                                    <th onClick={() => handleSort('issue_severity')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <span>SEV.</span>{renderSortIcon('issue_severity')}
+                                        </div>
+                                    </th>
+                                    <th onClick={() => handleSort('priority')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <span>PRIO.</span>{renderSortIcon('priority')}
+                                        </div>
+                                    </th>
+                                    <th onClick={() => handleSort('subject')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                                            <span>ISSUE</span>{renderSortIcon('subject')}
+                                        </div>
+                                    </th>
+                                    <th onClick={() => handleSort('status')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '160px', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                                            <span>STATUS</span>{renderSortIcon('status')}
+                                        </div>
+                                    </th>
+                                    <th onClick={() => handleSort('assignee')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '180px', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                                            <span>ASSIGNED TO</span>{renderSortIcon('assignee')}
+                                        </div>
+                                    </th>
+                                    <th onClick={() => handleSort('deadline')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '120px', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                                            <span>DEADLINE</span>{renderSortIcon('deadline')}
+                                        </div>
+                                    </th>
+                                    <th onClick={() => handleSort('modified_at')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '120px', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                                            <span>MODIFIED</span>{renderSortIcon('modified_at')}
+                                        </div>
+                                    </th>
                                 </tr>
                                 </thead>
                                 <tbody>
-                                {issues.map((issue) => (
-                                    <tr key={issue.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                        <td style={{ padding: '18px 15px', textAlign: 'center' }}>
-                                            <span style={{ width: '12px', height: '12px', borderRadius: '50%', display: 'inline-block', backgroundColor: getTypeColor(issue.type) }} />
-                                        </td>
-                                        <td style={{ padding: '18px 15px', textAlign: 'center' }}>
-                                            <span style={{ width: '12px', height: '12px', borderRadius: '50%', display: 'inline-block', backgroundColor: getSeverityColor(issue.severity) }} />
-                                        </td>
-                                        <td style={{ padding: '18px 15px', textAlign: 'center' }}>
-                                            <span style={{ width: '12px', height: '12px', borderRadius: '50%', display: 'inline-block', backgroundColor: getPriorityColor(issue.priority) }} />
-                                        </td>
+                                {issues.map((issue) => {
+                                    const currentDisplayStatus = localStatusChanges[issue.id] || issue.status?.name || 'In Progress';
 
-                                        <td style={{ padding: '18px 15px', textAlign: 'left' }}>
-                                            <span style={{ color: '#ff8c00', fontWeight: 'bold', marginRight: '5px' }}>#{issue.id}</span>
-                                            <span style={{ color: '#34495e', fontWeight: '500', fontSize: '15px' }}>{issue.subject}</span>
-                                        </td>
+                                    return (
+                                        <tr key={issue.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                            <td style={{ padding: '18px 15px', textAlign: 'center' }}>
+                                                <span style={{ width: '12px', height: '12px', borderRadius: '50%', display: 'inline-block', backgroundColor: getTypeColor(issue.type) }} />
+                                            </td>
+                                            <td style={{ padding: '18px 15px', textAlign: 'center' }}>
+                                                <span style={{ width: '12px', height: '12px', borderRadius: '50%', display: 'inline-block', backgroundColor: getSeverityColor(issue.severity) }} />
+                                            </td>
+                                            <td style={{ padding: '18px 15px', textAlign: 'center' }}>
+                                                <span style={{ width: '12px', height: '12px', borderRadius: '50%', display: 'inline-block', backgroundColor: getPriorityColor(issue.priority) }} />
+                                            </td>
 
-                                        <td style={{ padding: '18px 15px', textAlign: 'left' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                <select
-                                                    value={issue.status?.name || 'In Progress'}
-                                                    onChange={(e) => handleInlineStatusChange(issue.id, e.target.value)}
-                                                    style={{ padding: '5px 8px', border: '1px solid #cbd5e0', borderRadius: '4px', backgroundColor: '#fff', fontSize: '12px' }}
-                                                >
-                                                    {['New', 'In Progress', 'Ready for test', 'Needs Info', 'Rejected', 'Postponed', 'Closed'].map(opt => (
-                                                        <option key={opt} value={opt}>{opt}</option>
-                                                    ))}
-                                                </select>
-                                                <button
-                                                    onClick={() => handleSaveStatus(issue.id, issue.status)}
-                                                    style={{ background: '#5dc5b5', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', marginLeft: '6px' }}
-                                                >
-                                                    OK
-                                                </button>
-                                            </div>
-                                        </td>
+                                            <td style={{ padding: '18px 15px', textAlign: 'left' }}>
+                                                <span style={{ color: '#ff8c00', fontWeight: 'bold', marginRight: '5px' }}>#{issue.id}</span>
+                                                <span style={{ color: '#34495e', fontWeight: '500', fontSize: '15px' }}>{issue.subject}</span>
+                                            </td>
 
-                                        <td style={{ padding: '18px 15px', textAlign: 'left' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                <span style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#34495e', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold', marginRight: '8px' }}>
-                                                    {issue.assignee ? issue.assignee.slice(0, 2).toUpperCase() : '-'}
-                                                </span>
-                                                <span style={{ color: '#34495e', fontSize: '13px' }}>{issue.assignee || 'Unassigned'}</span>
-                                            </div>
-                                        </td>
+                                            <td style={{ padding: '18px 15px', textAlign: 'left' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                    <select
+                                                        value={currentDisplayStatus}
+                                                        onChange={(e) => handleInlineStatusChange(issue.id, e.target.value)}
+                                                        style={{ padding: '5px 8px', border: '1px solid #cbd5e0', borderRadius: '4px', backgroundColor: '#fff', fontSize: '12px' }}
+                                                    >
+                                                        {['New', 'In Progress', 'Ready for test', 'Needs Info', 'Rejected', 'Postponed', 'Closed'].map(opt => (
+                                                            <option key={opt} value={opt}>{opt}</option>
+                                                        ))}
+                                                    </select>
+                                                    <button
+                                                        onClick={() => handleSaveStatus(issue.id, issue.status)}
+                                                        style={{ background: '#5dc5b5', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', marginLeft: '6px' }}
+                                                    >
+                                                        OK
+                                                    </button>
+                                                </div>
+                                            </td>
 
-                                        <td style={{ padding: '18px 15px', color: '#94a3b8', fontSize: '13px', textAlign: 'left' }}>
-                                            {formatDate(issue.deadline)}
-                                        </td>
+                                            <td style={{ padding: '18px 15px', textAlign: 'left' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                    <span style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#34495e', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold', marginRight: '8px' }}>
+                                                        {issue.assignee ? issue.assignee.slice(0, 2).toUpperCase() : '-'}
+                                                    </span>
+                                                    <span style={{ color: '#34495e', fontSize: '13px' }}>{issue.assignee || 'Unassigned'}</span>
+                                                </div>
+                                            </td>
 
-                                        <td style={{ padding: '18px 15px', color: '#94a3b8', fontSize: '13px', textAlign: 'left' }}>
-                                            {formatDate(issue.modified_at)}
-                                        </td>
-                                    </tr>
-                                ))}
+                                            <td style={{ padding: '18px 15px', color: '#94a3b8', fontSize: '13px', textAlign: 'left' }}>
+                                                {formatDate(issue.deadline)}
+                                            </td>
+
+                                            <td style={{ padding: '18px 15px', color: '#94a3b8', fontSize: '13px', textAlign: 'left' }}>
+                                                {formatDate(issue.modified_at)}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                                 </tbody>
                             </table>
                         )}

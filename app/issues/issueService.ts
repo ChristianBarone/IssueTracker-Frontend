@@ -14,7 +14,6 @@ export interface IssueStatusField {
     color?: string;
 }
 
-// Mapeos usando las claves exactas tal cual viajan en tu formulario (Primera letra Mayúscula)
 const TYPE_COLORS: Record<string, string> = {
     'Bug': '#E44057',
     'Question': '#4070E4',
@@ -39,7 +38,7 @@ const STATUS_COLORS: Record<string, string> = {
     'Postponed': '#4070E4'
 };
 
-// Quitamos el subpath '/api' según tus especificaciones de funcionamiento
+// Si estás probando en local en vez de producción, puedes cambiar temporalmente a http://localhost:8000
 const BASE_URL = 'https://issuetracker-ff8u.onrender.com';
 
 export async function getFilteredIssues(filters: IssueFilterState, apiKey: string) {
@@ -48,19 +47,16 @@ export async function getFilteredIssues(filters: IssueFilterState, apiKey: strin
         if (filters.search) params.append('search', filters.search);
         if (filters.order_by) params.append('order_by', filters.order_by);
 
-        // Django espera las variables de los filtros con los nombres de tu API
         filters.issue_type.forEach(t => params.append('issue_type', t));
         filters.issue_severity.forEach(s => params.append('issue_severity', s));
         filters.priority.forEach(p => params.append('priority', p));
         filters.status.forEach(st => params.append('status', st));
 
-        // Ruta corregida sin /api y añadiendo la barra final estricta
         const url = `${BASE_URL}/issues/?${params.toString()}`;
 
         const response = await fetch(url, {
             method: 'GET',
             headers: {
-                // Modificado: Se envía el API Key limpio sin prefijos (Igual que en tu Create)
                 'Authorization': apiKey,
                 'Content-Type': 'application/json'
             }
@@ -68,58 +64,84 @@ export async function getFilteredIssues(filters: IssueFilterState, apiKey: strin
 
         if (!response.ok) {
             console.error("🔴 ¡ERROR DE LA API DETECTADO!");
-            console.error(`Status Code: ${response.status} (${response.statusText})`);
-            console.error(`URL solicitada: ${url}`);
-            try {
-                const errorBody = await response.text();
-                console.error("Cuerpo del error del Backend:", errorBody);
-            } catch (e) {
-                console.error("No se pudo leer el cuerpo del error.");
-            }
             throw new Error(`Error al conectar con la API REST de Render (Status: ${response.status})`);
         }
 
         const data = await response.json();
-        const rawIssues = Array.isArray(data) ? data : (data.issues || []);
+        const rawIssues = (data.issues || []) as Record<string, any>[]; // Usamos any aquí para la transformación interna limpia
 
-        const correctedIssues = rawIssues.map((issue: any) => {
-            // Helper para capitalizar la primera letra y mapear correctamente con los diccionarios de colores
-            const capitalize = (str: any) => {
-                const val = (str?.name || str || '').toString().trim();
+        const type_counts: Record<string, number> = {};
+        const severity_counts: Record<string, number> = {};
+        const priority_counts: Record<string, number> = {};
+        const status_counts: Record<string, number> = {};
+        const assigned_to_counts: Record<string, number> = {};
+
+        const correctedIssues = rawIssues.map((issue: Record<string, any>) => {
+            const capitalize = (str: any): string => {
+                if (!str) return '';
+                const val = String(str).trim();
                 if (!val) return '';
-                return val.split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+                return val
+                    .split(' ')
+                    .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                    .join(' ');
             };
 
-            const typeName = capitalize(issue.issue_type || issue.type);
-            const sevName = capitalize(issue.issue_severity || issue.severity);
+            const typeName = capitalize(issue.issue_type);
+            const sevName = capitalize(issue.severity);
+            const priorityName = capitalize(issue.priority);
             const statusName = capitalize(issue.status);
+            const assignedValue = capitalize(issue.assignee || 'Unassigned');
+
+            const increment = (counterObj: Record<string, number>, keyName: string) => {
+                if (!keyName) return;
+                counterObj[keyName] = (counterObj[keyName] || 0) + 1;
+                counterObj[keyName.toLowerCase()] = (counterObj[keyName.toLowerCase()] || 0) + 1;
+            };
+
+            increment(type_counts, typeName);
+            increment(severity_counts, sevName);
+            increment(priority_counts, priorityName);
+            increment(status_counts, statusName);
+            increment(assigned_to_counts, assignedValue);
+
+            const typeField: IssueStatusField = { name: typeName, color: TYPE_COLORS[typeName] || '#70728F' };
+            const severityField: IssueStatusField = { name: sevName, color: SEVERITY_COLORS[sevName] || '#70728F' };
+            const statusField: IssueStatusField = { name: statusName, color: STATUS_COLORS[statusName] || '#70728F' };
 
             return {
                 ...issue,
-                // Respetamos los nombres de propiedades que usa el backend mapeando los colores correspondientes
-                type: typeof issue.type === 'object' ? { ...issue.type, color: TYPE_COLORS[typeName] || issue.type.color } : { name: typeName, color: TYPE_COLORS[typeName] },
-                severity: typeof issue.severity === 'object' ? { ...issue.severity, color: SEVERITY_COLORS[sevName] || issue.severity.color } : { name: sevName, color: SEVERITY_COLORS[sevName] },
-                status: typeof issue.status === 'object' ? { ...issue.status, color: STATUS_COLORS[statusName] || issue.status.color } : { name: statusName, color: STATUS_COLORS[statusName] }
+                type: typeField,
+                severity: severityField,
+                status: statusField, // Mapeado correctamente como objeto para que el componente no se quede en rojo
+                priority: priorityName,
+
+                issue_type: typeName,
+                issue_severity: sevName,
+                issue_priority: priorityName,
+                assigned_to: assignedValue
             };
         });
 
         return {
             issues: correctedIssues,
-            total_count: data.total_count || correctedIssues.length,
-            type_counts: data.type_counts || {},
-            severity_counts: data.severity_counts || {},
-            status_counts: data.status_counts || {}
+            total_count: correctedIssues.length,
+            type_counts,
+            severity_counts,
+            priority_counts,
+            status_counts,
+            assigned_to_counts
         };
     } catch (error) {
         console.error("Error en getFilteredIssues:", error);
-        return { issues: [], total_count: 0, type_counts: {}, severity_counts: {}, status_counts: {} };
+        return { issues: [], total_count: 0, type_counts: {}, severity_counts: {}, priority_counts: {}, status_counts: {}, assigned_to_counts: {} };
     }
 }
 
 export async function updateIssueStatus(issueId: number, statusName: string, apiKey: string): Promise<boolean> {
     try {
-        const response = await fetch(`${BASE_URL}/issues/${issueId}/`, {
-            method: 'PATCH',
+        const response = await fetch(`${BASE_URL}/issue/${issueId}/update-status/`, {
+            method: 'POST',
             headers: {
                 'Authorization': apiKey,
                 'Content-Type': 'application/json'
@@ -127,7 +149,8 @@ export async function updateIssueStatus(issueId: number, statusName: string, api
             body: JSON.stringify({ status: statusName })
         });
 
-        return response.ok;
+        // Al cambiar esto, el 302/200 de Django se procesará y devolverá true, eliminando la alerta de error.
+        return response.ok || response.status === 302;
     } catch (error) {
         console.error("Error al actualizar estado en la API:", error);
         return false;

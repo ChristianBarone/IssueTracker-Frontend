@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function CreateIssuePage() {
-    // Valors per defecte
+    const router = useRouter();
+
     const [formData, setFormData] = useState({
         subject: '',
         description: '',
@@ -68,16 +70,7 @@ export default function CreateIssuePage() {
 
             if (response.ok) {
                 setStatusMessage({ text: `¡Issue #${data.id} creat amb èxit!`, isError: false });
-                setFormData({
-                    subject: '',
-                    description: '',
-                    status: 'In Progress',
-                    assigned_to: 'Unassigned',
-                    issue_type: 'Bug',
-                    issue_severity: 'Normal',
-                    priority: 'Normal',
-                    deadline: ''
-                });
+                router.push('/issues');
             } else {
                 console.error("Detalle del error de Django:", data);
                 setStatusMessage({
@@ -90,6 +83,9 @@ export default function CreateIssuePage() {
         } finally {
             setLoading(false);
         }
+    };
+    const handleCancel = () => {
+        router.push('/issues');
     };
 
     return (
@@ -271,8 +267,8 @@ export default function CreateIssuePage() {
 
                         <button
                             type="button"
-                            onClick={() => setFormData({ ...formData, subject: '', description: '', deadline: '' })}
-                            className="text-xs font-medium uppercase tracking-wider text-zinc-400 hover:text-zinc-600 transition-colors py-1"
+                            onClick={handleCancel}
+                            className="text-xs font-medium uppercase tracking-wider text-zinc-400 hover:text-zinc-600 transition-colors py-1 cursor-pointer"
                         >
                             Cancel
                         </button>
