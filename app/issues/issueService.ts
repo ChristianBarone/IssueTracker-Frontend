@@ -38,7 +38,6 @@ const STATUS_COLORS: Record<string, string> = {
     'Postponed': '#4070E4'
 };
 
-// Si estás probando en local en vez de producción, puedes cambiar temporalmente a http://localhost:8000
 const BASE_URL = 'https://issuetracker-ff8u.onrender.com';
 
 export async function getFilteredIssues(filters: IssueFilterState, apiKey: string) {
@@ -63,12 +62,12 @@ export async function getFilteredIssues(filters: IssueFilterState, apiKey: strin
         });
 
         if (!response.ok) {
-            console.error("🔴 ¡ERROR DE LA API DETECTADO!");
+            console.error("¡ERROR DE LA API DETECTADO!");
             throw new Error(`Error al conectar con la API REST de Render (Status: ${response.status})`);
         }
 
         const data = await response.json();
-        const rawIssues = (data.issues || []) as Record<string, any>[]; // Usamos any aquí para la transformación interna limpia
+        const rawIssues = (data.issues || []) as Record<string, unknown>[];
 
         const type_counts: Record<string, number> = {};
         const severity_counts: Record<string, number> = {};
@@ -76,8 +75,8 @@ export async function getFilteredIssues(filters: IssueFilterState, apiKey: strin
         const status_counts: Record<string, number> = {};
         const assigned_to_counts: Record<string, number> = {};
 
-        const correctedIssues = rawIssues.map((issue: Record<string, any>) => {
-            const capitalize = (str: any): string => {
+        const correctedIssues = rawIssues.map((issue: Record<string, unknown>) => {
+            const capitalize = (str: unknown): string => {
                 if (!str) return '';
                 const val = String(str).trim();
                 if (!val) return '';
@@ -113,7 +112,7 @@ export async function getFilteredIssues(filters: IssueFilterState, apiKey: strin
                 ...issue,
                 type: typeField,
                 severity: severityField,
-                status: statusField, // Mapeado correctamente como objeto para que el componente no se quede en rojo
+                status: statusField,
                 priority: priorityName,
 
                 issue_type: typeName,
@@ -148,8 +147,6 @@ export async function updateIssueStatus(issueId: number, statusName: string, api
             },
             body: JSON.stringify({ status: statusName })
         });
-
-        // Al cambiar esto, el 302/200 de Django se procesará y devolverá true, eliminando la alerta de error.
         return response.ok || response.status === 302;
     } catch (error) {
         console.error("Error al actualizar estado en la API:", error);
