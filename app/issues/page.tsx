@@ -90,12 +90,21 @@ export default function IssuesPage() {
                 const currentFilters = JSON.parse(filtersString) as IssueFilterState;
                 const data = await getFilteredIssues(currentFilters, apiKey);
                 if (isMounted) {
-                    // Normalización del objeto status para evitar errores de tipo en TypeScript
-                    const normalizedIssues = (data.issues || []).map((issue: any) => ({
+                    // CORREGIDO: Tipado seguro sin usar 'any' para evitar que se queje el linter
+                    const normalizedIssues = (data.issues || []).map((issue: Record<string, unknown>) => ({
                         ...issue,
+                        id: Number(issue.id),
+                        subject: String(issue.subject || ''),
+                        description: issue.description ? String(issue.description) : null,
+                        type: (issue.type as IssueField | null),
+                        severity: (issue.severity as IssueField | null),
+                        priority: issue.priority ? String(issue.priority) : null,
+                        assignee: issue.assignee ? String(issue.assignee) : null,
+                        deadline: issue.deadline ? String(issue.deadline) : null,
+                        modified_at: issue.modified_at ? String(issue.modified_at) : null,
                         status: typeof issue.status === 'string'
                             ? { name: issue.status }
-                            : (issue.status || { name: 'In Progress' })
+                            : ((issue.status as IssueField | null) || { name: 'In Progress' })
                     }));
 
                     setIssues(normalizedIssues);
@@ -257,6 +266,7 @@ export default function IssuesPage() {
                                             <input type="checkbox" checked={filters.priority.includes(p.name)} onChange={() => handleCheckboxChange('priority', p.name)} />
                                             {p.name}
                                         </label>
+                                        {/* CORREGIDO: Modificado font_weight por fontWeight */}
                                         <span style={{ backgroundColor: '#ebf0f5', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>
                                             {getCountSafe(priorityCounts, p.name)}
                                         </span>
@@ -347,8 +357,17 @@ export default function IssuesPage() {
                                             </td>
 
                                             <td style={{ padding: '18px 15px', textAlign: 'left' }}>
-                                                <span style={{ color: '#ff8c00', fontWeight: 'bold', marginRight: '5px' }}>#{issue.id}</span>
-                                                <span style={{ color: '#34495e', fontWeight: '500', fontSize: '15px' }}>{issue.subject}</span>
+                                                <Link
+                                                    href={`/issues/${issue.id}`}
+                                                    style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                                                >
+                                                    <span style={{ color: '#ff8c00', fontWeight: 'bold', marginRight: '6px', cursor: 'pointer' }}>
+                                                        #{issue.id}
+                                                    </span>
+                                                    <span style={{ color: '#34495e', fontWeight: '500', fontSize: '15px', cursor: 'pointer' }} onMouseEnter={(e) => e.currentTarget.style.color = '#5dc5b5'} onMouseLeave={(e) => e.currentTarget.style.color = '#34495e'}>
+                                                        {issue.subject}
+                                                    </span>
+                                                </Link>
                                             </td>
 
                                             <td style={{ padding: '18px 15px', textAlign: 'left' }}>
