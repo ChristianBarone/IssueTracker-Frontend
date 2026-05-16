@@ -21,12 +21,10 @@ export default function IssueDetailPage() {
     const [loading, setLoading] = useState<boolean>(true);
     const [activeTab, setActiveTab] = useState<'comments' | 'activities'>('comments');
 
-    // Estados para la gestión de comentarios
     const [newCommentBody, setNewCommentBody] = useState('');
     const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
     const [editingCommentBody, setEditingCommentBody] = useState('');
 
-    // Estados para edición inline del título (Subject)
     const [isEditingSubject, setIsEditingSubject] = useState(false);
     const [subjectInput, setSubjectInput] = useState('');
 
@@ -73,20 +71,19 @@ export default function IssueDetailPage() {
     };
 
     const handleDeleteCommentClick = async (commentId: number) => {
-        if (confirm("¿Seguro que quieres eliminar este comentario?")) {
+        if (confirm("¿Segur que vols esborrar aquest comentari?")) {
             const success = await deleteComment(commentId);
             if (success) loadData();
         }
     };
 
     const handleDeleteIssueClick = async () => {
-        if (confirm("🚨 ¿ESTÁS SEGURO DE QUE DESEAS ELIMINAR ESTA ISSUE COMPLETAMENTE?")) {
+        if (confirm(" ¿Estas segur d'eliminar aquesta issue?")) {
             const success = await deleteIssue(issueId);
             if (success) router.push('/issues');
         }
     };
 
-    // Helper para formatear fechas de forma dinámica/relativa como en tu captura de la derecha
     const getRelativeTimeString = (dateString: string) => {
         const commentDate = new Date(dateString);
         const now = new Date();
@@ -105,7 +102,6 @@ export default function IssueDetailPage() {
         return `${weeks} week${weeks > 1 ? 's' : ''}, ${remainingDays} day${remainingDays !== 1 ? 's' : ''} ago`;
     };
 
-    // Helper para recuperar paleta de colores nativa si el objeto viene roto o como string puro
     const getColorFallback = (type: string, name: string) => {
         const clean = name.toLowerCase().trim();
         if (type === 'Type') return clean === 'bug' ? '#E44057' : '#4db6ac';
@@ -119,7 +115,6 @@ export default function IssueDetailPage() {
     if (loading) return <div className="p-10 text-center text-zinc-400 font-medium">Loading issue data...</div>;
     if (!issue) return <div className="p-10 text-center text-red-500 font-medium">Issue not found.</div>;
 
-    // Normalización robusta tolerando "issue_type" o "type" indistintamente
     const rawType = issue.issue_type || (issue as any).type;
     const sideAttributes = [
         {
@@ -143,7 +138,7 @@ export default function IssueDetailPage() {
         <div className="min-h-screen bg-[#f4f7f9] text-[#333] font-sans py-10 px-6">
             <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-8">
 
-                {/* SECCIÓN IZQUIERDA: CONTENIDO PRINCIPAL */}
+                {/* SECCIÓN IZQUIERDA*/}
                 <div className="flex-1 min-w-0">
 
                     {/* ENCABEZADO */}
@@ -177,7 +172,7 @@ export default function IssueDetailPage() {
                         </p>
                     </div>
 
-                    {/* PANEL DE DESCRIPCIÓN */}
+                    {/* DESCRIPCIÓ */}
                     <div className="bg-white p-6 rounded-lg shadow-sm border border-zinc-200/60 mb-6">
                         <div className="mb-4">
                             <span
@@ -193,7 +188,7 @@ export default function IssueDetailPage() {
                             {issue.description || <span className="italic text-zinc-400">No description provided</span>}
                         </p>
 
-                        {/* ARCHIVOS ADJUNTOS */}
+                        {/* ATTACHMENT*/}
                         <div className="mt-6">
                             <h3 className="text-sm font-bold text-[#2c3e50] mb-3">
                                 {issue.attachments?.length || 0} {(issue.attachments?.length === 1) ? 'Attachment' : 'Attachments'}
@@ -208,7 +203,7 @@ export default function IssueDetailPage() {
                         </div>
                     </div>
 
-                    {/* BLOQUE DE COMENTARIOS / ACTIVIDADES */}
+                    {/* COMENTARIOS / ACTIVIDADES */}
                     <div className="bg-white p-6 rounded-lg shadow-sm border border-zinc-200/60">
                         <div className="flex gap-6 border-b border-zinc-200 mb-6">
                             <span
@@ -285,12 +280,12 @@ export default function IssueDetailPage() {
 
                                                 {editingCommentId === com.id ? (
                                                     <div>
-                    <textarea
-                        value={editingCommentBody}
-                        onChange={(e) => setEditingCommentBody(e.target.value)}
-                        className="w-full p-2 border border-zinc-300 rounded text-sm outline-none focus:border-zinc-400"
-                        rows={2}
-                    />
+                                                        <textarea
+                                                            value={editingCommentBody}
+                                                            onChange={(e) => setEditingCommentBody(e.target.value)}
+                                                            className="w-full p-2 border border-zinc-300 rounded text-sm outline-none focus:border-zinc-400"
+                                                            rows={2}
+                                                        />
                                                         <div className="mt-2 flex gap-3 justify-end items-center">
                                                             <span onClick={() => setEditingCommentId(null)} className="cursor-pointer text-zinc-400 hover:text-zinc-600 text-xs font-medium">Cancelar</span>
                                                             <button onClick={() => handleSaveCommentEdit(com.id)} className="bg-[#4db6ac] text-white px-3 py-1 rounded text-xs font-bold hover:bg-[#3ca398]">GUARDAR</button>
