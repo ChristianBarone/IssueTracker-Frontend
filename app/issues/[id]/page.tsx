@@ -5,9 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
     fetchIssueDetail, updateIssueFields, deleteIssue,
-    addComment, editComment, deleteComment
+    addComment, editComment, deleteComment,
+    addWatcher, deleteWatcher
 } from './detailService';
-import { IssueDetailData } from './types';
+import { IssueDetailData, UserProfile } from './types';
 
 export default function IssueDetailPage() {
     const { id } = useParams();
@@ -27,6 +28,17 @@ export default function IssueDetailPage() {
 
     const [isEditingSubject, setIsEditingSubject] = useState(false);
     const [subjectInput, setSubjectInput] = useState('');
+
+    const [selectedUserId, setSelectedUserId] = useState<string>('');
+    // cambiar
+    const [availableUsers, setAvailableUsers] = useState<UserProfile[]>([
+        { id: 1, username: 'adminUser' },
+        { id: 2, username: 'Andreu-Caro' },
+        { id: 3, username: 'shahverdyan' },
+        { id: 4, username: 'HalaAlkhatib-81' },
+        { id: 5, username: 'martipiris' },
+        { id: 6, username: 'ChristianAlejandroBarone' },
+    ]);
 
     const loadData = async () => {
         if (!issueId) return;
@@ -81,6 +93,34 @@ export default function IssueDetailPage() {
         if (confirm(" ¿Estas segur d'eliminar aquesta issue?")) {
             const success = await deleteIssue(issueId);
             if (success) router.push('/issues');
+        }
+    };
+
+    const handleAddWatcherSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedUserId || !issue) return;
+        const idToNumber = Number(selectedUserId);
+        // Evitar duplicados
+        if (issue.watchers.some(w => w.id === idToNumber)) {
+            setSelectedUserId('');
+            return;
+        }
+        const success = await addWatcher(issueId, idToNumber);
+        if (success) {
+            loadData();
+            setSelectedUserId('');
+        } else {
+            alert("No se ha podido añadir al watcher.");
+        }
+    };
+
+    const handleDeleteWatcher = async (userId: number) => {
+        if (!issue) return;
+        const success = await deleteWatcher(issueId, userId);
+        if (success) {
+            loadData();
+        } else {
+            alert("No se ha podido eliminar al watcher.");
         }
     };
 
@@ -349,6 +389,63 @@ export default function IssueDetailPage() {
                         <span className="font-semibold text-zinc-700">
                             {issue.assignee?.username ? `@${issue.assignee.username}` : 'Unassigned'}
                         </span>
+                    </div>
+
+                    <div className="mt-4 border-b border-zinc-100 pb-4">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3">
+                            WATCHERS ({issue.watchers?.length || 0})
+                        </h4>
+
+                        {/* Lista de watchers actuales */}
+                        <ul className="mb-4 flex flex-col gap-2">
+                            {/* Añadimos 'index' como segundo parámetro del map */}
+                            {issue.watchers?.map((watcher, index) => (
+                                /* Combinamos el id (si existe) con el index para asegurar que sea 100% único */
+                                <li key={`${watcher.id || 'watcher'}-${index}`} className="flex justify-between items-center text-sm bg-zinc-50 p-2 rounded border border-zinc-100">
+                                    <div className="flex items-center gap-2">
+                                        {watcher.avatar_url ? (
+                                            <img className="w-6 h-6 rounded-full object-cover" src={watcher.avatar_url} alt="N/A" />
+                                        ) : (
+                                            <span className="w-6 h-6 rounded-full bg-[#4db6ac] text-white flex items-center justify-center text-[10px] font-bold uppercase">
+                                                {(watcher.username?.slice(0, 2) || '??')}
+                                            </span>
+                                        )}
+                                        <span className="text-zinc-700 font-medium text-xs">@{watcher.username || 'unknown'}</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDeleteWatcher(watcher.id)}
+                                        className="text-zinc-400 hover:text-red-500 font-bold transition-colors text-xs px-1"
+                                        title="Remove watcher"
+                                    >
+                                        ✕
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+
+                        {/* Formulario selector */}
+                        <form onSubmit={handleAddWatcherSubmit} className="flex gap-1">
+                            <select
+                                name="user_id"
+                                value={selectedUserId}
+                                onChange={(e) => setSelectedUserId(e.target.value)}
+                                className="flex-1 bg-white border border-zinc-200 rounded text-xs p-2 outline-none focus:border-zinc-400 text-zinc-600"
+                            >
+                                <option value="">Add user...</option>
+                                {availableUsers.map((user) => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.username}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                type="submit"
+                                className="bg-zinc-100 text-zinc-700 border border-zinc-200 px-3 py-1.5 rounded text-sm font-bold hover:bg-zinc-200 active:bg-zinc-300 transition-colors"
+                            >
+                                +
+                            </button>
+                        </form>
                     </div>
 
                     <div className="mt-8">

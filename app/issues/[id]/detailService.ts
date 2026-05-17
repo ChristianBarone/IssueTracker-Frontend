@@ -1,4 +1,4 @@
-import { IssueDetailData } from './types';
+import { IssueDetailData, UserProfile } from './types';
 
 const BASE_URL = 'https://issuetracker-ff8u.onrender.com';
 const API_KEY = 'Mxk4bUdzGtId8imUNgVKHUiheNKT4AKl';
@@ -50,6 +50,35 @@ export async function deleteIssue(id: number): Promise<boolean> {
         return res.ok;
     } catch (error) {
         console.error("Error deleting issue:", error);
+        return false;
+    }
+}
+
+// Añadir watcher <userId> a issue <issueId>
+export async function addWatcher(issueId: number, userId: number): Promise<boolean> {
+    try {
+        const res = await fetch(`${BASE_URL}/issues/${issueId}/watchers/`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ user_id: userId }),
+        });
+        return res.ok;
+    } catch (error) {
+        console.error("Error adding watcher:", error);
+        return false;
+    }
+}
+
+// Eliminar watcher <watcherId> de la issue <issueId>
+export async function deleteWatcher(issueId: number, watcherId: number): Promise<boolean> {
+    try {
+        const res = await fetch(`${BASE_URL}/issues/${issueId}/watchers/${watcherId}/`, {
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+        return res.ok;
+    } catch (error) {
+        console.error("Error deleting watcher:", error);
         return false;
     }
 }
