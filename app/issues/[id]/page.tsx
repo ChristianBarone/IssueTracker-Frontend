@@ -100,14 +100,14 @@ export default function IssueDetailPage() {
         e.preventDefault();
         if (!selectedUserId || !issue) return;
         const idToNumber = Number(selectedUserId);
-        // Evitar duplicados
-        if (issue.watchers.some(w => w.id === idToNumber)) {
-            setSelectedUserId('');
-            return;
-        }
+        const userToAdd = availableUsers.find(u => u.id === idToNumber);
+        if (!userToAdd) return;
         const success = await addWatcher(issueId, idToNumber);
         if (success) {
-            loadData();
+            setIssue({
+                ...issue,
+                watchers: [...issue.watchers, userToAdd]
+            });
             setSelectedUserId('');
         } else {
             alert("No se ha podido añadir al watcher.");
@@ -119,6 +119,10 @@ export default function IssueDetailPage() {
         const success = await deleteWatcher(issueId, userId);
         if (success) {
             loadData();
+            setIssue({
+                ...issue,
+                watchers: issue.watchers.filter(w => w.id !== userId)
+            });
         } else {
             alert("No se ha podido eliminar al watcher.");
         }
@@ -398,30 +402,38 @@ export default function IssueDetailPage() {
 
                         {/* Lista de watchers actuales */}
                         <ul className="mb-4 flex flex-col gap-2">
-                            {/* Añadimos 'index' como segundo parámetro del map */}
-                            {issue.watchers?.map((watcher, index) => (
-                                /* Combinamos el id (si existe) con el index para asegurar que sea 100% único */
-                                <li key={`${watcher.id || 'watcher'}-${index}`} className="flex justify-between items-center text-sm bg-zinc-50 p-2 rounded border border-zinc-100">
-                                    <div className="flex items-center gap-2">
-                                        {watcher.avatar_url ? (
-                                            <img className="w-6 h-6 rounded-full object-cover" src={watcher.avatar_url} alt="N/A" />
-                                        ) : (
-                                            <span className="w-6 h-6 rounded-full bg-[#4db6ac] text-white flex items-center justify-center text-[10px] font-bold uppercase">
-                                                {(watcher.username?.slice(0, 2) || '??')}
-                                            </span>
-                                        )}
-                                        <span className="text-zinc-700 font-medium text-xs">@{watcher.username || 'unknown'}</span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleDeleteWatcher(watcher.id)}
-                                        className="text-zinc-400 hover:text-red-500 font-bold transition-colors text-xs px-1"
-                                        title="Remove watcher"
-                                    >
-                                        ✕
-                                    </button>
-                                </li>
-                            ))}
+                            {issue.watchers?.map((watcherOrId, index) => {
+                                // 1. Si el backend te da un número, buscamos el objeto completo en 'availableUsers'
+                                // Si ya te da un objeto, usamos ese objeto directamente.
+                                const watcherFullData = typeof watcherOrId === 'number'
+                                    ? availableUsers.find(u => u.id === watcherOrId)
+                                    : watcherOrId;
+
+                                // 2. Si no lo encuentra en ningún lado, creamos un objeto vacío de respaldo
+                                const watcher = watcherFullData || { id: watcherOrId, username: 'unknown' };
+
+                                return (
+                                    <li key={`${watcher.id}-${index}`} className="flex justify-between items-center text-sm bg-zinc-50 p-2 rounded border border-zinc-100">
+                                        <div className="flex items-center gap-2">
+                                            {watcher.avatar_url ? (
+                                                <img className="w-6 h-6 rounded-full object-cover" src={watcher.avatar_url} alt="N/A" />
+                                            ) : (
+                                                <span className="w-6 h-6 rounded-full bg-[#4db6ac] text-white flex items-center justify-center text-[10px] font-bold uppercase">
+                                                    {(watcher.username?.slice(0, 2) || '??')}
+                                                </span>
+                                            )}
+                                            <span className="text-zinc-700 font-medium text-xs">@{watcher.username || 'unknown'}</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveWatcher(watcher.id)}
+                                            className="text-zinc-400 hover:text-red-500 font-bold transition-colors text-xs px-1"
+                                        >
+                                            ✕
+                                        </button>
+                                    </li>
+                                );
+                            })}
                         </ul>
 
                         {/* Formulario selector */}

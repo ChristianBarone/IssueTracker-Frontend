@@ -72,7 +72,7 @@ export async function addWatcher(issueId: number, userId: number): Promise<boole
 // Eliminar watcher <watcherId> de la issue <issueId>
 export async function deleteWatcher(issueId: number, watcherId: number): Promise<boolean> {
     try {
-        const res = await fetch(`${BASE_URL}/issues/${issueId}/watchers/${watcherId}/`, {
+        const res = await fetch(`${BASE_URL}/issues/${issueId}/watchers/${watcherId}`, {
             method: 'DELETE',
             headers: getHeaders(),
         });

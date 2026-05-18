@@ -153,3 +153,20 @@ export async function updateIssueStatus(issueId: number, statusName: string, api
         return false;
     }
 }
+
+export async function updateIssueFields(id: number, apiKey: string, fields: Record<string, unknown>): Promise<boolean> {
+    try {
+        const res = await fetch(`${BASE_URL}/issues/${id}/`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': apiKey,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(fields),
+        });
+        return res.ok;
+    } catch (error) {
+        console.error("Error updating issue:", error);
+        return false;
+    }
+}
