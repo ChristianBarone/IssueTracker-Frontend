@@ -15,7 +15,7 @@ export default function CreateIssuePage() {
         issue_severity: 'Normal',
         priority: 'Normal',
         deadline: '',
-        attachment: '',
+        files: [] as File[],
     });
 
     const [loading, setLoading] = useState(false);
@@ -24,10 +24,21 @@ export default function CreateIssuePage() {
     const getApiKey = () => 'Mxk4bUdzGtId8imUNgVKHUiheNKT4AKl';
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value
-        });
+        const target = e.target as HTMLInputElement;
+
+        // Si es un input file, capturar los archivos
+        if (target.type === 'file' && target.files) {
+            setFormData({
+                ...formData,
+                files: Array.from(target.files)
+            });
+        } else {
+            // Para otros inputs, capturar el valor como string
+            setFormData({
+                ...formData,
+                [e.target.name]: e.target.value
+            });
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -59,9 +70,10 @@ export default function CreateIssuePage() {
                 dataEnvelope.append('assignee', formData.assigned_to);
             }
 
-            if (formData.attachment) {
-                dataEnvelope.append('attachment', formData.attachment)
-            }
+            // Agregar archivos (pueden ser múltiples)
+            formData.files.forEach(file => {
+                dataEnvelope.append('files', file);
+            });
 
             const response = await fetch('https://issuetracker-ff8u.onrender.com/issues/', {
                 method: 'POST',
@@ -74,7 +86,7 @@ export default function CreateIssuePage() {
             const data = await response.json().catch(() => ({}));
 
             if (response.ok) {
-                setStatusMessage({ text: `¡Issue #${data.id} creat amb èxit!`, isError: false });
+                setStatusMessage({ text: `Successfully created issue #${data.id}!`, isError: false });
                 router.push('/issues');
             } else {
                 console.error("Detalle del error de Django:", data);
@@ -146,9 +158,9 @@ export default function CreateIssuePage() {
 
                         {/* ATTACHMENTS */}
                         <div className="flex flex-col gap-2">
-                            <span className="text-base font-medium text-[#2c3e50]">Add attachments</span>
-                            <div className="border border-dashed border-zinc-300 rounded p-8 text-center text-zinc-400 bg-zinc-50/50 text-sm">
-                                <input type="file" onChange={handleChange} name="attachment"/>
+                            <span className="text-base font-medium text-[#2c3e50]">Add attachment</span>
+                            <div className="border border-dashed border-zinc-300 rounded p-8 text-center text-zinc-400 bg-zinc-50/50 text-sm cursor-pointer">
+                                <input type="file" className="cursor-pointer" onChange={handleChange} name="files"/>
                             </div>
                         </div>
                     </div>
@@ -255,7 +267,7 @@ export default function CreateIssuePage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className={`w-full h-11 text-base font-medium uppercase tracking-wider rounded transition-colors ${
+                            className={`w-full h-11 text-base font-medium uppercase tracking-wider rounded transition-colors cursor-pointer ${
                                 loading
                                     ? 'bg-zinc-300 text-zinc-500 cursor-not-allowed'
                                     : 'bg-[#80cbd7] text-white hover:bg-[#4db6ac] shadow-sm'

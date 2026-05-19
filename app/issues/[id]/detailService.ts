@@ -99,3 +99,17 @@ export async function deleteComment(commentId: number): Promise<boolean> {
         return false;
     }
 }
+
+// Eliminar attachment
+export async function deleteAttachment(attachmentId: number): Promise<boolean> {
+    try {
+        const res = await fetch(`${BASE_URL}/attachments/${attachmentId}`, {
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+        return res.ok;
+    } catch (error) {
+        console.error("Error deleting attachment:", error);
+        return false;
+    }
+}

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
     fetchIssueDetail, updateIssueFields, deleteIssue,
-    addComment, editComment, deleteComment
+    addComment, editComment, deleteComment, deleteAttachment
 } from './detailService';
 import { IssueDetailData } from './types';
 
@@ -16,6 +16,7 @@ export default function IssueDetailPage() {
 
     // Hardcode del usuario actual logueado para la validación de comentarios
     const CURRENT_USER = "Andreu-Caro";
+    const CURRENT_USER_ID = 3;
 
     const [issue, setIssue] = useState<IssueDetailData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
@@ -47,7 +48,7 @@ export default function IssueDetailPage() {
         const success = await updateIssueFields(issueId, { subject: subjectInput });
         if (success) {
             setIsEditingSubject(false);
-            loadData();
+            await loadData();
         }
     };
 
@@ -57,7 +58,7 @@ export default function IssueDetailPage() {
         const success = await addComment(issueId, newCommentBody);
         if (success) {
             setNewCommentBody('');
-            loadData();
+            await loadData();
         }
     };
 
@@ -66,14 +67,14 @@ export default function IssueDetailPage() {
         const success = await editComment(commentId, editingCommentBody);
         if (success) {
             setEditingCommentId(null);
-            loadData();
+            await loadData();
         }
     };
 
     const handleDeleteCommentClick = async (commentId: number) => {
         if (confirm("Are you sure you want to delete this comment?")) {
             const success = await deleteComment(commentId);
-            if (success) loadData();
+            if (success) await loadData();
         }
     };
 
@@ -83,6 +84,11 @@ export default function IssueDetailPage() {
             if (success) router.push('/issues');
         }
     };
+
+    const handleDeleteAttachmentClick= async (attachmentId: number) => {
+        const success = await deleteAttachment(attachmentId)
+        if (success) await loadData();
+    }
 
     const getRelativeTimeString = (dateString: string) => {
         const commentDate = new Date(dateString);
@@ -99,7 +105,7 @@ export default function IssueDetailPage() {
         }
         const weeks = Math.floor(diffDays / 7);
         const remainingDays = diffDays % 7;
-        return `${weeks} week${weeks > 1 ? 's' : ''}, ${remainingDays} day${remainingDays !== 1 ? 's' : ''} ago`;
+        return `${weeks} week${weeks > 1 ? 's' : ''}, ${remainingDays} day${remainingDays === 1 ? '' : 's'} ago`;
     };
 
     const getColorFallback = (type: string, name: string) => {
@@ -198,13 +204,21 @@ export default function IssueDetailPage() {
                             <h3 className="text-sm font-bold text-[#2c3e50] mb-3">
                                 {issue.attachments?.length || 0} {(issue.attachments?.length === 1) ? 'Attachment' : 'Attachments'}
                             </h3>
-                            <div className="flex flex-col gap-2">
-                                {issue.attachments?.map(att => (
-                                    <div key={att.id} className="flex justify-between items-center p-2.5 bg-zinc-50 rounded border border-zinc-200/80 text-sm">
-                                        <a href={att.file_url} target="_blank" rel="noreferrer" className="text-[#4db6ac] hover:underline font-medium">{att.name}</a>
-                                    </div>
-                                ))}
-                            </div>
+                            {issue.attachments?.length === 0 ?
+                                ''
+                                : <div
+                                    className="flex flex-col gap-2 p-2.5 bg-zinc-50 rounded border border-zinc-200/80 text-sm">
+                                    {issue.attachments?.map(att => (
+                                        <div key={att.id} className="flex flex-row justify-between items-center">
+                                            <a href={att.file_url} target="_blank" rel="noreferrer"
+                                               className="text-[#4db6ac] hover:underline font-medium cursor-pointer">{att.name}</a>
+                                            <button onClick={() => handleDeleteAttachmentClick(att.id)}
+                                                    className="cursor-pointer w-8.5 border-2 border-red-500 text-red-500 font-bold p-1.25 transition duration-200 hover:bg-red-500 hover:text-white">X
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            }
                         </div>
                     </div>
 
