@@ -78,7 +78,7 @@ export default function CreateIssuePage() {
                     isError: true
                 });
             }
-        } catch (error) {
+        } catch {
             setStatusMessage({ text: 'Error de connexió amb el Back-End.', isError: true });
         } finally {
             setLoading(false);
