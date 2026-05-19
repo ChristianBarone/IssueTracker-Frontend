@@ -14,7 +14,8 @@ export default function CreateIssuePage() {
         issue_type: 'Bug',
         issue_severity: 'Normal',
         priority: 'Normal',
-        deadline: ''
+        deadline: '',
+        attachment: '',
     });
 
     const [loading, setLoading] = useState(false);
@@ -56,6 +57,10 @@ export default function CreateIssuePage() {
 
             if (formData.assigned_to !== 'Unassigned') {
                 dataEnvelope.append('assignee', formData.assigned_to);
+            }
+
+            if (formData.attachment) {
+                dataEnvelope.append('attachment', formData.attachment)
             }
 
             const response = await fetch('https://issuetracker-ff8u.onrender.com/issues/', {
@@ -143,13 +148,7 @@ export default function CreateIssuePage() {
                         <div className="flex flex-col gap-2">
                             <span className="text-base font-medium text-[#2c3e50]">Add attachments</span>
                             <div className="border border-dashed border-zinc-300 rounded p-8 text-center text-zinc-400 bg-zinc-50/50 text-sm">
-                                <input type="file" className="hidden" id="file-upload" disabled />
-                                <label htmlFor="file-upload" className="cursor-pointer">
-                                    <span className="border border-solid border-zinc-400 bg-zinc-200/60 px-3 py-1.5 rounded text-xs text-zinc-700 mr-2 shadow-sm">
-                                        Seleccionar archivo
-                                    </span>
-                                    Ningún archivo seleccionado
-                                </label>
+                                <input type="file" onChange={handleChange} name="attachment"/>
                             </div>
                         </div>
                     </div>
