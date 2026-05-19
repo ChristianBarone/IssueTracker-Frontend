@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
 import { IssueDetailData } from './types';
 
 const BASE_URL = 'https://issuetracker-ff8u.onrender.com';
@@ -11,7 +12,7 @@ const getHeaders = () => ({
 // Obtener los detalles de una issue por ID
 export async function fetchIssueDetail(id: number): Promise<IssueDetailData | null> {
     try {
-        const res = await fetch(`${BASE_URL}/issues/${id}/`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/issues/${id}/`, {
             method: 'GET',
             headers: getHeaders(),
             cache: 'no-store' // Para que siempre traiga comentarios frescos
@@ -28,7 +29,7 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
 // Cambiamos Record<string, any> por Record<string, unknown>
 export async function updateIssueFields(id: number, fields: Record<string, unknown>): Promise<boolean> {
     try {
-        const res = await fetch(`${BASE_URL}/issues/${id}/`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/issues/${id}/`, {
             method: 'PUT',
             headers: getHeaders(),
             body: JSON.stringify(fields),
@@ -43,7 +44,7 @@ export async function updateIssueFields(id: number, fields: Record<string, unkno
 // Eliminar por completo la Issue via DELETE
 export async function deleteIssue(id: number): Promise<boolean> {
     try {
-        const res = await fetch(`${BASE_URL}/issues/${id}/`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/issues/${id}/`, {
             method: 'DELETE',
             headers: getHeaders(),
         });
@@ -59,7 +60,7 @@ export async function deleteIssue(id: number): Promise<boolean> {
 // Añadir comentario
 export async function addComment(issueId: number, body: string): Promise<boolean> {
     try {
-        const res = await fetch(`${BASE_URL}/issues/${issueId}/comments/`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/issues/${issueId}/comments/`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify({ body }),
@@ -74,7 +75,7 @@ export async function addComment(issueId: number, body: string): Promise<boolean
 // Editar comentario existente
 export async function editComment(commentId: number, body: string): Promise<boolean> {
     try {
-        const res = await fetch(`${BASE_URL}/comments/${commentId}/`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/comments/${commentId}/`, {
             method: 'PUT',
             headers: getHeaders(),
             body: JSON.stringify({ body }),
@@ -89,7 +90,7 @@ export async function editComment(commentId: number, body: string): Promise<bool
 // Eliminar comentario
 export async function deleteComment(commentId: number): Promise<boolean> {
     try {
-        const res = await fetch(`${BASE_URL}/comments/${commentId}/`, {
+        const res = await fetchWithTimeout(`${BASE_URL}/comments/${commentId}/`, {
             method: 'DELETE',
             headers: getHeaders(),
         });

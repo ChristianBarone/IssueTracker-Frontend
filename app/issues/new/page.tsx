@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
 
 export default function CreateIssuePage() {
     const router = useRouter();
@@ -58,7 +59,7 @@ export default function CreateIssuePage() {
                 dataEnvelope.append('assignee', formData.assigned_to);
             }
 
-            const response = await fetch('https://issuetracker-ff8u.onrender.com/issues/', {
+            const response = await fetchWithTimeout('https://issuetracker-ff8u.onrender.com/issues/', {
                 method: 'POST',
                 headers: {
                     'Authorization': getApiKey()

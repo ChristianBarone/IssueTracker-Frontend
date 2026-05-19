@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "../lib/fetchWithTimeout";
+
 export interface IssueFilterState {
     search: string;
     order_by: string;
@@ -53,7 +55,7 @@ export async function getFilteredIssues(filters: IssueFilterState, apiKey: strin
 
         const url = `${BASE_URL}/issues/?${params.toString()}`;
 
-        const response = await fetch(url, {
+        const response = await fetchWithTimeout(url, {
             method: 'GET',
             headers: {
                 'Authorization': apiKey,
@@ -139,7 +141,7 @@ export async function getFilteredIssues(filters: IssueFilterState, apiKey: strin
 
 export async function updateIssueStatus(issueId: number, statusName: string, apiKey: string): Promise<boolean> {
     try {
-        const response = await fetch(`${BASE_URL}/issue/${issueId}/update-status/`, {
+        const response = await fetchWithTimeout(`${BASE_URL}/issue/${issueId}/update-status/`, {
             method: 'POST',
             headers: {
                 'Authorization': apiKey,
