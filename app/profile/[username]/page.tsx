@@ -3,10 +3,9 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { fetchProfile, ProfileData, ProfileIssue } from '../profileService';
-
-const API_KEY = 'Mxk4bUdzGtId8imUNgVKHUiheNKT4AKl';
+import { clearStoredUser, getStoredApiKey } from '../../lib/auth';
 
 function formatDate(value: string | null | undefined) {
     if (!value) return 'No date available';
@@ -104,9 +103,17 @@ function CommentRow({ comment }: { comment: { id: number; author: string; body: 
     );
 }
 
+type ProfileComment = {
+    id: number;
+    author: string;
+    body: string;
+    created_at: string;
+};
+
 export default function ProfilePage() {
     const params = useParams<{ username: string }>();
     const searchParams = useSearchParams();
+    const router = useRouter();
     const username = decodeURIComponent(params.username);
 
     const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -127,9 +134,15 @@ export default function ProfilePage() {
         const loadProfile = async () => {
             setLoading(true);
             setError(null);
+            setProfile(null);
 
             try {
-                const data = await fetchProfile(username, API_KEY);
+                const apiKey = getStoredApiKey();
+                if (!apiKey) {
+                    throw new Error('Session expired. Please sign in again.');
+                }
+
+                const data = await fetchProfile(username, apiKey);
                 if (mounted) {
                     setProfile(data);
                 }
@@ -151,14 +164,27 @@ export default function ProfilePage() {
         };
     }, [username]);
 
-    const items = useMemo(() => {
-        if (!profile) return [];
+    const issueItems = useMemo<ProfileIssue[]>(() => {
+        if (!profile || tab === 'comments') return [];
         if (tab === 'watched') return profile.watched_issues ?? [];
-        if (tab === 'comments') return profile.comments;
         return profile.open_assigned_issues;
     }, [profile, tab]);
 
+    const commentItems = useMemo<ProfileComment[]>(() => {
+        if (!profile || tab !== 'comments') return [];
+        return profile.comments;
+    }, [profile, tab]);
+
     const watchedCount = profile?.watched_issues?.length ?? 0;
+
+    const handleSwitchUser = () => {
+        clearStoredUser();
+        router.replace('/');
+    };
+
+    const handleRetry = () => {
+        router.refresh();
+    };
 
     return (
         <main
@@ -253,6 +279,15 @@ export default function ProfilePage() {
                                 >
                                     BACK TO ISSUES
                                 </Link>
+                                {isOwner && (
+                                    <button
+                                        type="button"
+                                        onClick={handleSwitchUser}
+                                        className="inline-flex min-h-12 items-center justify-center rounded-lg bg-[#fef2f2] px-4 font-bold text-[#991b1b] shadow-[0_4px_0_#fecaca] transition-transform hover:-translate-y-px"
+                                    >
+                                        SWITCH USER
+                                    </button>
+                                )}
                             </div>
                         </>
                     ) : null}
@@ -283,6 +318,20 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="p-6 md:p-6">
+                        {error && (
+                            <div className="mb-5 rounded-[14px] border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                                <div className="font-bold">Profile load failed</div>
+                                <div className="mt-1">{error}</div>
+                                <button
+                                    type="button"
+                                    onClick={handleRetry}
+                                    className="mt-3 inline-flex items-center rounded-lg bg-white px-3 py-2 font-bold text-rose-700 shadow-[0_3px_0_#fecaca]"
+                                >
+                                    Retry
+                                </button>
+                            </div>
+                        )}
+
                         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <h2 className="m-0 text-[20px] font-bold text-slate-900">User Profile</h2>
@@ -300,16 +349,12 @@ export default function ProfilePage() {
                             <div className="rounded-[14px] border border-slate-200 bg-slate-50 p-5 text-center text-slate-400">
                                 Loading profile content…
                             </div>
-                        ) : error ? (
-                            <div className="rounded-[14px] border border-rose-200 bg-rose-50 p-5 text-center text-rose-700">
-                                {error}
-                            </div>
                         ) : (
                             <div className="space-y-4">
                                 {tab === 'comments' ? (
-                                    items.length > 0 ? (
+                                    commentItems.length > 0 ? (
                                         <div className="space-y-4">
-                                            {items.map((comment) => (
+                                            {commentItems.map((comment) => (
                                                 <CommentRow key={comment.id} comment={comment} />
                                             ))}
                                         </div>
@@ -318,9 +363,9 @@ export default function ProfilePage() {
                                             This user has not posted any comments yet.
                                         </div>
                                     )
-                                ) : items.length > 0 ? (
+                                ) : issueItems.length > 0 ? (
                                     <div className="space-y-3">
-                                        {items.map((issue) => (
+                                        {issueItems.map((issue) => (
                                             <IssueRow key={issue.id} issue={issue} />
                                         ))}
                                     </div>

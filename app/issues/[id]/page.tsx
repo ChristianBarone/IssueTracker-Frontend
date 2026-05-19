@@ -8,18 +8,17 @@ import {
     addComment, editComment, deleteComment
 } from './detailService';
 import { IssueDetailData } from './types';
+import { getStoredUser } from '../../lib/auth';
 
 export default function IssueDetailPage() {
     const { id } = useParams();
     const router = useRouter();
     const issueId = Number(id);
 
-    // Hardcode del usuario actual logueado para la validación de comentarios
-    const CURRENT_USER = "Andreu-Caro";
-
     const [issue, setIssue] = useState<IssueDetailData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [activeTab, setActiveTab] = useState<'comments' | 'activities'>('comments');
+    const [currentUser, setCurrentUser] = useState<string | null>(null);
 
     const [newCommentBody, setNewCommentBody] = useState('');
     const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
@@ -41,6 +40,19 @@ export default function IssueDetailPage() {
     useEffect(() => {
         loadData();
     }, [issueId]);
+
+    useEffect(() => {
+        const storedUser = getStoredUser();
+        setCurrentUser(storedUser);
+
+        const onStorage = () => {
+            const nextUser = getStoredUser();
+            setCurrentUser(nextUser);
+        };
+
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
+    }, []);
 
     const handleSaveSubject = async () => {
         if (!subjectInput.trim()) return;
@@ -266,7 +278,7 @@ export default function IssueDetailPage() {
                                     {issue.comments?.map(com => {
                                         // Limpiamos los nombres quitando espacios y el símbolo '@'
                                         const cleanAuthor = com.author?.replace('@', '').trim().toLowerCase() || '';
-                                        const cleanCurrentUser = CURRENT_USER.replace('@', '').trim().toLowerCase();
+                                        const cleanCurrentUser = (currentUser ?? '').replace('@', '').trim().toLowerCase();
 
                                         // Si el autor del comentario coincide con el usuario activo, activamos los permisos
                                         const isMyComment = cleanAuthor === cleanCurrentUser;

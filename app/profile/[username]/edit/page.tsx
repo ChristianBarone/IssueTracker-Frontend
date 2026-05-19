@@ -5,8 +5,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { fetchProfile, updateProfile } from '../../profileService';
-
-const API_KEY = 'Mxk4bUdzGtId8imUNgVKHUiheNKT4AKl';
+import { getStoredApiKey } from '../../../lib/auth';
 
 export default function EditProfilePage() {
     const params = useParams<{ username: string }>();
@@ -33,7 +32,12 @@ export default function EditProfilePage() {
             setError(null);
 
             try {
-                const profile = await fetchProfile(username, API_KEY);
+                const apiKey = getStoredApiKey();
+                if (!apiKey) {
+                    throw new Error('Session expired. Please sign in again.');
+                }
+
+                const profile = await fetchProfile(username, apiKey);
                 if (!mounted) return;
 
                 setBio(profile.bio || '');
@@ -81,7 +85,12 @@ export default function EditProfilePage() {
         setError(null);
 
         try {
-            await updateProfile(username, API_KEY, { bio, avatar: avatarFile });
+            const apiKey = getStoredApiKey();
+            if (!apiKey) {
+                throw new Error('Session expired. Please sign in again.');
+            }
+
+            await updateProfile(username, apiKey, { bio, avatar: avatarFile });
             router.push(`/profile/${encodeURIComponent(username)}`);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to save profile.');

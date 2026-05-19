@@ -1,6 +1,7 @@
 import { fetchWithTimeout } from "../lib/fetchWithTimeout";
 
-const BASE_URL = 'https://issuetracker-ff8u.onrender.com';
+const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const BASE_URL = isLocalhost ? 'http://localhost:8000' : 'https://issuetracker-ff8u.onrender.com';
 
 export interface ProfileIssue {
     id: number;
@@ -54,21 +55,47 @@ export interface ProfileData {
 }
 
 export async function fetchProfile(username: string, apiKey: string): Promise<ProfileData> {
-    const response = await fetchWithTimeout(`${BASE_URL}/profile/${encodeURIComponent(username)}`, {
-        method: 'GET',
-        headers: {
-            Authorization: apiKey,
-            'Content-Type': 'application/json'
+    // Try once, and retry once on abort/timeout errors
+    try {
+        const response = await fetchWithTimeout(`${BASE_URL}/profile/${encodeURIComponent(username)}`, {
+            method: 'GET',
+            headers: {
+                Authorization: apiKey,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const payload = await response.json();
+
+        if (!response.ok) {
+            throw new Error(payload?.message || `Failed to load profile (${response.status})`);
         }
-    });
 
-    const payload = await response.json();
+        return payload as ProfileData;
+    } catch (err: any) {
+        const msg = err?.message ?? String(err);
+        if (msg.includes('aborted') || msg.includes('timed out')) {
+            // transient abort — retry once
+            await new Promise((r) => setTimeout(r, 500));
+            const response = await fetchWithTimeout(`${BASE_URL}/profile/${encodeURIComponent(username)}`, {
+                method: 'GET',
+                headers: {
+                    Authorization: apiKey,
+                    'Content-Type': 'application/json'
+                }
+            });
 
-    if (!response.ok) {
-        throw new Error(payload?.message || `Failed to load profile (${response.status})`);
+            const payload = await response.json();
+
+            if (!response.ok) {
+                throw new Error(payload?.message || `Failed to load profile (${response.status})`);
+            }
+
+            return payload as ProfileData;
+        }
+
+        throw err;
     }
-
-    return payload as ProfileData;
 }
 
 export async function updateProfile(
@@ -83,19 +110,43 @@ export async function updateProfile(
         formData.append('avatar', data.avatar);
     }
 
-    const response = await fetchWithTimeout(`${BASE_URL}/profile/${encodeURIComponent(username)}`, {
-        method: 'PUT',
-        headers: {
-            Authorization: apiKey
-        },
-        body: formData
-    });
+    try {
+        const response = await fetchWithTimeout(`${BASE_URL}/profile/${encodeURIComponent(username)}`, {
+            method: 'PUT',
+            headers: {
+                Authorization: apiKey
+            },
+            body: formData
+        });
 
-    const payload = await response.json();
+        const payload = await response.json();
 
-    if (!response.ok) {
-        throw new Error(payload?.message || `Failed to update profile (${response.status})`);
+        if (!response.ok) {
+            throw new Error(payload?.message || `Failed to update profile (${response.status})`);
+        }
+
+        return payload as ProfileData;
+    } catch (err: any) {
+        const msg = err?.message ?? String(err);
+        if (msg.includes('aborted') || msg.includes('timed out')) {
+            await new Promise((r) => setTimeout(r, 500));
+            const response = await fetchWithTimeout(`${BASE_URL}/profile/${encodeURIComponent(username)}`, {
+                method: 'PUT',
+                headers: {
+                    Authorization: apiKey
+                },
+                body: formData
+            });
+
+            const payload = await response.json();
+
+            if (!response.ok) {
+                throw new Error(payload?.message || `Failed to update profile (${response.status})`);
+            }
+
+            return payload as ProfileData;
+        }
+
+        throw err;
     }
-
-    return payload as ProfileData;
 }

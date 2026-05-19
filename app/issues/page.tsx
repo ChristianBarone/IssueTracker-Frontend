@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getFilteredIssues, updateIssueStatus, IssueFilterState } from './issueService';
+import { getFilteredIssues, updateIssueStatus, IssueFilterState, IssueListResult } from './issueService';
+import { getStoredApiKey, getStoredUser } from '../lib/auth';
 
 interface IssueField {
     name: string;
@@ -51,7 +52,8 @@ export default function IssuesPage() {
         assigned_to: []
     });
 
-    const apiKey = "Mxk4bUdzGtId8imUNgVKHUiheNKT4AKl";
+    const apiKey = getStoredApiKey();
+    const currentUser = getStoredUser() ?? 'Andreu-Caro';
 
     const handleSort = (field: string) => {
         setFilters(prev => {
@@ -87,9 +89,19 @@ export default function IssuesPage() {
         const loadIssues = async () => {
             setLoading(true);
             try {
+                if (!apiKey) {
+                    throw new Error('Session expired. Please sign in again.');
+                }
+
                 const currentFilters = JSON.parse(filtersString) as IssueFilterState;
-                const data = await getFilteredIssues(currentFilters, apiKey);
+                const data: IssueListResult = await getFilteredIssues(currentFilters, apiKey);
                 if (isMounted) {
+                    if (data.error) {
+                        setError(data.error);
+                    } else {
+                        setError(null);
+                    }
+
                     // CORREGIDO: Tipado seguro sin usar 'any' para evitar que se queje el linter
                     const normalizedIssues = (data.issues || []).map((issue: Record<string, unknown>) => ({
                         ...issue,
@@ -115,17 +127,16 @@ export default function IssuesPage() {
                     setStatusCounts(data.status_counts || {});
                     setPriorityCounts(data.priority_counts || {});
 
-                    setError(null);
                 }
             } catch (err) {
-                if (isMounted) setError("Error de sincronización.");
+                if (isMounted) setError(err instanceof Error ? err.message : 'Error de sincronización.');
             } finally {
                 if (isMounted) setLoading(false);
             }
         };
         loadIssues();
         return () => { isMounted = false; };
-    }, [filtersString, refreshTrigger]);
+    }, [filtersString, refreshTrigger, apiKey]);
 
     const handleCheckboxChange = (category: keyof Omit<IssueFilterState, 'search' | 'order_by'>, value: string) => {
         setFilters(prev => {
@@ -142,6 +153,11 @@ export default function IssuesPage() {
     };
 
     const handleSaveStatus = async (issueId: number, currentStatus: IssueField | null) => {
+        if (!apiKey) {
+            setError('Session expired. Please sign in again.');
+            return;
+        }
+
         const targetStatus = localStatusChanges[issueId] || currentStatus?.name || 'In Progress';
 
         const success = await updateIssueStatus(issueId, targetStatus, apiKey);
@@ -204,12 +220,19 @@ export default function IssuesPage() {
                     </Link>
                     <button style={{ padding: '10px 18px', backgroundColor: '#d1d5db', color: '#374151', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #64748b' }}>BULK ADD</button>
                     <button style={{ padding: '10px 18px', backgroundColor: '#d1d5db', color: '#374151', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #64748b' }}>SETTINGS</button>
-                    <button style={{ padding: '10px 18px', backgroundColor: '#64748b', color: '#fff', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #475569' }}>PROFILE</button>
+                    <Link href={`/profile/${encodeURIComponent(currentUser)}`} style={{ textDecoration: 'none' }}>
+                        <button style={{ padding: '10px 18px', backgroundColor: '#64748b', color: '#fff', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #475569', cursor: 'pointer' }}>PROFILE</button>
+                    </Link>
                 </header>
 
                 <div style={{ display: 'flex', gap: '25px', alignItems: 'flex-start' }}>
                     {showFilters && (
                         <aside style={{ width: '280px', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                            {error && (
+                                <div style={{ margin: '12px', padding: '12px 14px', borderRadius: '10px', border: '1px solid #fecaca', backgroundColor: '#fff1f2', color: '#be123c', fontSize: '13px', fontWeight: 600 }}>
+                                    {error}
+                                </div>
+                            )}
                             <div style={{ padding: '15px', backgroundColor: '#edf2f7', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '13px' }}>
                                 <span>Filters ({totalCount})</span>
                             </div>
@@ -294,30 +317,32 @@ export default function IssuesPage() {
                     <main style={{ flexGrow: 1, backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', overflow: 'hidden' }}>
                         {loading ? (
                             <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>Sincronizando con el servidor...</div>
-                        ) : (
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <thead>
-                                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-                                    <th onClick={() => handleSort('issue_type')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <span>TYPE</span>{renderSortIcon('issue_type')}
-                                        </div>
-                                    </th>
-                                    <th onClick={() => handleSort('issue_severity')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <span>SEV.</span>{renderSortIcon('issue_severity')}
-                                        </div>
-                                    </th>
-                                    <th onClick={() => handleSort('priority')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <span>PRIO.</span>{renderSortIcon('priority')}
-                                        </div>
-                                    </th>
-                                    <th onClick={() => handleSort('subject')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                                            <span>ISSUE</span>{renderSortIcon('subject')}
-                                        </div>
-                                    </th>
+                        ) : error ? (
+                                <div style={{ padding: '60px', textAlign: 'center', color: '#b91c1c' }}>{error}</div>
+                            ) : (
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                                        <th onClick={() => handleSort('issue_type')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <span>TYPE</span>{renderSortIcon('issue_type')}
+                                            </div>
+                                        </th>
+                                        <th onClick={() => handleSort('issue_severity')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <span>SEV.</span>{renderSortIcon('issue_severity')}
+                                            </div>
+                                        </th>
+                                        <th onClick={() => handleSort('priority')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <span>PRIO.</span>{renderSortIcon('priority')}
+                                            </div>
+                                        </th>
+                                        <th onClick={() => handleSort('subject')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                <span>ISSUE</span>{renderSortIcon('subject')}
+                                            </div>
+                                        </th>
                                     <th onClick={() => handleSort('status')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '160px', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}>
                                         <div style={{ display: 'flex', alignItems: 'center' }}>
                                             <span>STATUS</span>{renderSortIcon('status')}

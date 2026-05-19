@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
+import { getApiBaseUrl } from '../../lib/apiBaseUrl';
+import { getStoredApiKey, HARD_CODED_USERS } from '../../lib/auth';
 
 export default function CreateIssuePage() {
     const router = useRouter();
@@ -21,7 +23,7 @@ export default function CreateIssuePage() {
     const [loading, setLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
-    const getApiKey = () => 'Mxk4bUdzGtId8imUNgVKHUiheNKT4AKl';
+    const getApiKey = () => getStoredApiKey();
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         setFormData({
@@ -42,6 +44,13 @@ export default function CreateIssuePage() {
         }
 
         try {
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                setStatusMessage({ text: 'Session expired. Please sign in again.', isError: true });
+                setLoading(false);
+                return;
+            }
+
             const dataEnvelope = new FormData();
 
             dataEnvelope.append('subject', formData.subject);
@@ -59,10 +68,11 @@ export default function CreateIssuePage() {
                 dataEnvelope.append('assignee', formData.assigned_to);
             }
 
-            const response = await fetchWithTimeout('https://issuetracker-ff8u.onrender.com/issues/', {
+            const baseUrl = getApiBaseUrl();
+            const response = await fetchWithTimeout(`${baseUrl}/issues/`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': getApiKey()
+                    'Authorization': apiKey
                 },
                 body: dataEnvelope
             });
@@ -186,8 +196,9 @@ export default function CreateIssuePage() {
                                 className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
                             >
                                 <option value="Unassigned">Unassigned</option>
-                                <option value="admin">admin</option>
-                                <option value="pepe">pepe</option>
+                                {HARD_CODED_USERS.map((user) => (
+                                    <option key={user} value={user}>{user}</option>
+                                ))}
                             </select>
                         </div>
 
