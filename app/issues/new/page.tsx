@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
 import { getApiBaseUrl } from '../../lib/apiBaseUrl';
-import { getStoredApiKey, USERNAMES } from '../../lib/auth';
+import { AUTH_USERS, getStoredApiKey, getStoredUsername, getUserIdByUsername } from '../../lib/auth';
 
 export default function CreateIssuePage() {
     const router = useRouter();
@@ -13,7 +13,7 @@ export default function CreateIssuePage() {
         subject: '',
         description: '',
         status: 'In Progress',
-        assigned_to: 'Unassigned',
+        assigned_to: '',
         issue_type: 'Bug',
         issue_severity: 'Normal',
         priority: 'Normal',
@@ -24,6 +24,11 @@ export default function CreateIssuePage() {
     const [statusMessage, setStatusMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
     const getApiKey = () => getStoredApiKey();
+    const currentUser = getStoredUsername();
+    const currentUserId = useMemo(() => {
+        if (!currentUser) return null;
+        return getUserIdByUsername(currentUser);
+    }, [currentUser]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         setFormData({
@@ -64,24 +69,8 @@ export default function CreateIssuePage() {
                 dataEnvelope.append('deadline', formData.deadline);
             }
 
-            if (formData.assigned_to !== 'Unassigned') {
-                let assigneeId = '1'; // Valor de respaldo por defecto
-
-                if (formData.assigned_to === 'Marti-Piris') {
-                    assigneeId = '2';
-                } else if (formData.assigned_to === 'Andreu-Caro') {
-                    assigneeId = '3';
-                } else if (formData.assigned_to === 'Hala-Alkhatib') {
-                    assigneeId = '4';
-                } else if (formData.assigned_to === 'Aleks-Shahverdyan') {
-                    assigneeId = '5';
-                } else if (formData.assigned_to === 'Christian-Alejandro-Barone') {
-                    assigneeId = '6';
-                } else if (formData.assigned_to === 'adminUser') {
-                    assigneeId = '1';
-                }
-
-                dataEnvelope.append('assignee', assigneeId);
+            if (formData.assigned_to) {
+                dataEnvelope.append('assignee', formData.assigned_to);
             }
 
             const baseUrl = getApiBaseUrl();
@@ -205,17 +194,30 @@ export default function CreateIssuePage() {
 
                         <div className="flex flex-col gap-1">
                             <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Assigned To</label>
-                            <select
-                                name="assigned_to"
-                                value={formData.assigned_to}
-                                onChange={handleChange}
-                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
-                            >
-                                <option value="Unassigned">Unassigned</option>
-                                {USERNAMES.map((user) => (
-                                    <option key={user} value={user}>{user}</option>
-                                ))}
-                            </select>
+                            <div className="flex flex-col gap-2">
+                                <select
+                                    name="assigned_to"
+                                    value={formData.assigned_to}
+                                    onChange={handleChange}
+                                    className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
+                                >
+                                    <option value="">Unassigned</option>
+                                    {AUTH_USERS.map((user) => (
+                                        <option key={user.id} value={String(user.id)}>{user.username}</option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData((prev) => ({
+                                        ...prev,
+                                        assigned_to: currentUserId == null ? '' : String(currentUserId)
+                                    }))}
+                                    disabled={currentUserId == null}
+                                    className="w-fit whitespace-nowrap border border-zinc-300 bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-700 rounded hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Assign to me
+                                </button>
+                            </div>
                         </div>
 
                         <div className="flex flex-col gap-1">
