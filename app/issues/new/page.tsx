@@ -2,6 +2,9 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
+import { getApiBaseUrl } from '../../lib/apiBaseUrl';
+import { getStoredApiKey, USERNAMES } from '../../lib/auth';
 
 export default function CreateIssuePage() {
     const router = useRouter();
@@ -21,7 +24,7 @@ export default function CreateIssuePage() {
     const [loading, setLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
-    const getApiKey = () => 'Mxk4bUdzGtId8imUNgVKHUiheNKT4AKl';
+    const getApiKey = () => getStoredApiKey();
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const target = e.target as HTMLInputElement;
@@ -51,6 +54,13 @@ export default function CreateIssuePage() {
         }
 
         try {
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                setStatusMessage({ text: 'Session expired. Please sign in again.', isError: true });
+                setLoading(false);
+                return;
+            }
+
             const dataEnvelope = new FormData();
 
             dataEnvelope.append('subject', formData.subject);
@@ -65,17 +75,34 @@ export default function CreateIssuePage() {
             }
 
             if (formData.assigned_to !== 'Unassigned') {
-                dataEnvelope.append('assignee', formData.assigned_to);
+                let assigneeId = '1'; // Valor de respaldo por defecto
+
+                if (formData.assigned_to === 'Marti-Piris') {
+                    assigneeId = '2';
+                } else if (formData.assigned_to === 'Andreu-Caro') {
+                    assigneeId = '3';
+                } else if (formData.assigned_to === 'Hala-Alkhatib') {
+                    assigneeId = '4';
+                } else if (formData.assigned_to === 'Aleks-Shahverdyan') {
+                    assigneeId = '5';
+                } else if (formData.assigned_to === 'Christian-Alejandro-Barone') {
+                    assigneeId = '6';
+                } else if (formData.assigned_to === 'adminUser') {
+                    assigneeId = '1';
+                }
+
+                dataEnvelope.append('assignee', assigneeId);
             }
 
             formData.files.forEach(file => {
                 dataEnvelope.append('files', file);
             });
 
-            const response = await fetch('https://issuetracker-ff8u.onrender.com/issues/', {
+            const baseUrl = getApiBaseUrl();
+            const response = await fetchWithTimeout(`${baseUrl}/issues/`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': getApiKey()
+                    'Authorization': apiKey
                 },
                 body: dataEnvelope
             });
@@ -87,8 +114,14 @@ export default function CreateIssuePage() {
                 router.push('/issues');
             } else {
                 console.error("Detalle del error de Django:", data);
+
+                let serverError = 'Error del servidor al validar los campos.';
+                if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+                    serverError = JSON.stringify(data);
+                }
+
                 setStatusMessage({
-                    text: data.error || data.message || 'Error del servidor al validar los campos.',
+                    text: data.error || data.message || serverError,
                     isError: true
                 });
             }
@@ -98,6 +131,7 @@ export default function CreateIssuePage() {
             setLoading(false);
         }
     };
+
     const handleCancel = () => {
         router.push('/issues');
     };
@@ -106,12 +140,10 @@ export default function CreateIssuePage() {
         <div className="min-h-screen bg-[#f4f7f9] text-[#333] font-sans flex flex-col items-center justify-start py-12 px-4">
             <div className="w-full max-w-5xl bg-white rounded-lg shadow-sm border border-zinc-200/60 p-8">
 
-                {/* TÍTOL CENTRAL DE LA INTERFÍCIE */}
                 <h1 className="text-center text-[28px] font-normal text-[#2c3e50] mb-8">
                     New issue
                 </h1>
 
-                {/* FEEDBACK */}
                 {statusMessage && (
                     <div className={`p-4 mb-6 rounded-md text-sm font-medium border ${
                         statusMessage.isError
@@ -126,7 +158,6 @@ export default function CreateIssuePage() {
 
                     {/* CONTINGUT */}
                     <div className="md:col-span-2 flex flex-col gap-5">
-                        {/* SUBJECT */}
                         <div className="flex flex-col gap-1">
                             <input
                                 type="text"
@@ -141,7 +172,6 @@ export default function CreateIssuePage() {
                             </button>
                         </div>
 
-                        {/* DESCRIPCIÓ */}
                         <div>
                             <textarea
                                 name="description"
@@ -153,7 +183,6 @@ export default function CreateIssuePage() {
                             />
                         </div>
 
-                        {/* ATTACHMENTS */}
                         <div className="flex flex-col gap-2">
                             <span className="text-base font-medium text-[#2c3e50]">Add attachment</span>
                             <div className="border border-dashed border-zinc-300 rounded p-8 text-center text-zinc-400 bg-zinc-50/50 text-sm cursor-pointer">
@@ -162,10 +191,9 @@ export default function CreateIssuePage() {
                         </div>
                     </div>
 
-                    {/* ATRIBUTS  */}
+                    {/* ATRIBUTS */}
                     <div className="bg-[#f8fafc] border border-zinc-200/80 rounded p-5 flex flex-col gap-5 h-fit">
 
-                        {/* STATUS */}
                         <div className="flex flex-col gap-1.5">
                             <select
                                 name="status"
@@ -183,7 +211,6 @@ export default function CreateIssuePage() {
                             </select>
                         </div>
 
-                        {/* ASSIGNED TO */}
                         <div className="flex flex-col gap-1">
                             <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Assigned To</label>
                             <select
@@ -193,12 +220,12 @@ export default function CreateIssuePage() {
                                 className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
                             >
                                 <option value="Unassigned">Unassigned</option>
-                                <option value="admin">admin</option>
-                                <option value="pepe">pepe</option>
+                                {USERNAMES.map((user) => (
+                                    <option key={user} value={user}>{user}</option>
+                                ))}
                             </select>
                         </div>
 
-                        {/* TYPE */}
                         <div className="flex flex-col gap-1">
                             <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Type</label>
                             <select
@@ -213,7 +240,6 @@ export default function CreateIssuePage() {
                             </select>
                         </div>
 
-                        {/* SEVERITY */}
                         <div className="flex flex-col gap-1">
                             <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Severity</label>
                             <select
@@ -230,7 +256,6 @@ export default function CreateIssuePage() {
                             </select>
                         </div>
 
-                        {/* PRIORITY */}
                         <div className="flex flex-col gap-1">
                             <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Priority</label>
                             <select
@@ -245,7 +270,6 @@ export default function CreateIssuePage() {
                             </select>
                         </div>
 
-                        {/* DEADLINE */}
                         <div className="flex flex-col gap-1">
                             <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Deadline</label>
                             <input
@@ -259,7 +283,6 @@ export default function CreateIssuePage() {
 
                     </div>
 
-                    {/* ACTIONS: CREATE I CANCEL */}
                     <div className="md:col-span-3 flex flex-col items-center gap-3 mt-4">
                         <button
                             type="submit"
