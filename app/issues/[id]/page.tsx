@@ -4,11 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-    fetchIssueDetail, updateIssueFields, deleteIssue,
+    fetchIssueDetail, updateIssueFields, updateIssueAssignee, deleteIssue,
     addComment, editComment, deleteComment
 } from './detailService';
 import { IssueDetailData } from './types';
-import { getStoredUsername } from '../../lib/auth';
+import { AUTH_USERS, getStoredUsername, getUserIdByUsername, getUserById } from '../../lib/auth';
 
 export default function IssueDetailPage() {
     const { id } = useParams();
@@ -18,7 +18,7 @@ export default function IssueDetailPage() {
     const [issue, setIssue] = useState<IssueDetailData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [activeTab, setActiveTab] = useState<'comments' | 'activities'>('comments');
-    const [currentUser, setCurrentUser] = useState<string | null>(null);
+    const [currentUser, setCurrentUser] = useState<string | null>(() => getStoredUsername() ?? null);
 
     const [newCommentBody, setNewCommentBody] = useState('');
     const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
@@ -26,11 +26,22 @@ export default function IssueDetailPage() {
 
     const [isEditingSubject, setIsEditingSubject] = useState(false);
     const [subjectInput, setSubjectInput] = useState('');
+    const [isSavingAssignee, setIsSavingAssignee] = useState(false);
+    const [assigneeMessage, setAssigneeMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
     const loadData = async () => {
         if (!issueId) return;
         const data = await fetchIssueDetail(issueId);
         if (data) {
+            // If backend returned an assignee object without a numeric id, try to map it to our local users
+            if (data.assignee && typeof data.assignee === 'object' && Number(data.assignee.id) === 0) {
+                const assigneeUsername = 'username' in data.assignee ? String(data.assignee.username || '') : '';
+                const possibleId = getUserIdByUsername(assigneeUsername);
+                if (possibleId != null) {
+                    data.assignee = getUserById(possibleId) ?? { id: possibleId, username: assigneeUsername };
+                }
+            }
+
             setIssue(data);
             setSubjectInput(data.subject);
         }
@@ -38,16 +49,21 @@ export default function IssueDetailPage() {
     };
 
     useEffect(() => {
+        let cancelled = false;
         if (issueId) {
-            loadData();
+            queueMicrotask(() => {
+                if (!cancelled) {
+                    void loadData();
+                }
+            });
         }
+        return () => {
+            cancelled = true;
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [issueId]);
 
     useEffect(() => {
-        const storedUser = getStoredUsername() ?? null;
-        setCurrentUser(storedUser);
-
         const onStorage = () => {
             const nextUser = getStoredUsername() ?? null;
             setCurrentUser(nextUser);
@@ -97,6 +113,48 @@ export default function IssueDetailPage() {
             const success = await deleteIssue(issueId);
             if (success) router.push('/issues');
         }
+    };
+
+    const handleAssigneeSelectChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const nextValue = e.target.value;
+        setIsSavingAssignee(true);
+        setAssigneeMessage(null);
+        const result = await updateIssueAssignee(issueId, nextValue ? Number(nextValue) : null);
+        if (result.ok) {
+            // Optimistic UI: use local mapping so the select shows the new assignee
+            const newId = nextValue ? Number(nextValue) : null;
+            if (newId != null) {
+                setIssue(prev => prev ? { ...prev, assignee: getUserById(newId) ?? { id: newId, username: AUTH_USERS.find(u=>u.id===newId)?.username ?? '' } } : prev);
+            } else {
+                setIssue(prev => prev ? { ...prev, assignee: null } : prev);
+            }
+            await loadData();
+            setAssigneeMessage({ text: 'Assignee updated.', isError: false });
+        } else {
+            const detail = result.status ? ` (${result.status})` : '';
+            setAssigneeMessage({ text: `${result.message || 'Could not update assignee'}${detail}`, isError: true });
+        }
+        setIsSavingAssignee(false);
+    };
+
+    const handleAssignToMe = async () => {
+        if (!currentUser) return;
+        const myId = getUserIdByUsername(currentUser);
+        if (myId == null) return;
+
+        setIsSavingAssignee(true);
+        setAssigneeMessage(null);
+        const result = await updateIssueAssignee(issueId, myId);
+        if (result.ok) {
+            // Optimistic UI update: set local assignee to our known user so UI reflects it even if profile endpoints are flaky
+            setIssue(prev => prev ? { ...prev, assignee: getUserById(myId) ?? { id: myId, username: getUserById(myId)?.username ?? '' } } : prev);
+            await loadData();
+            setAssigneeMessage({ text: 'Assigned to you.', isError: false });
+        } else {
+            const detail = result.status ? ` (${result.status})` : '';
+            setAssigneeMessage({ text: `${result.message || 'Could not assign to you'}${detail}`, isError: true });
+        }
+        setIsSavingAssignee(false);
     };
 
     const getRelativeTimeString = (dateString: string) => {
@@ -180,6 +238,29 @@ export default function IssueDetailPage() {
     const cleanCreator = creatorName.replace('@', '').trim().toLowerCase();
     const cleanCurrentUser = (currentUser ?? '').replace('@', '').trim().toLowerCase();
     const isMyIssue = currentUser && cleanCreator === cleanCurrentUser;
+    const currentAssigneeValue = (() => {
+        if (!issue.assignee) return '';
+
+        // If server already returned an object with numeric id, use it.
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const asAny: any = issue.assignee;
+            if (asAny && typeof asAny === 'object' && Number.isFinite(asAny.id) && asAny.id > 0) {
+                return String(asAny.id);
+            }
+            // Fallback: try to extract username if it's a string or object without id
+            const rawUsername = (typeof issue.assignee === 'string') ? issue.assignee : (issue.assignee.username ?? '');
+            const username = String(rawUsername).replace('@', '').trim();
+            if (!username || username.toLowerCase() === 'unassigned') return '';
+            const fallbackId = getUserIdByUsername(username);
+            return fallbackId == null ? '' : String(fallbackId);
+        } catch (err) {
+            console.debug('Error computing currentAssigneeValue', err);
+            return '';
+        }
+    })();
+    try { console.debug('[page] assignee raw:', issue.assignee, '-> currentAssigneeValue:', currentAssigneeValue); } catch {}
+    const canAssignToMe = !!currentUser && assigneeName.replace('@', '').trim().toLowerCase() !== cleanCurrentUser;
 
     return (
         <div className="min-h-screen bg-[#f4f7f9] text-[#333] font-sans py-10 px-6">
@@ -388,24 +469,32 @@ export default function IssueDetailPage() {
                     </div>
 
                     <div className="flex justify-between items-center py-3 border-b border-zinc-100 text-sm">
-                        <span className="text-zinc-400">Deadline</span>
-                        <span className="font-semibold text-zinc-700">
-                            {issue.deadline ? new Date(issue.deadline).toLocaleDateString('en-GB') : 'No date'}
-                        </span>
-                    </div>
-
-                    <div className="flex justify-between items-center py-3 border-b border-zinc-100 text-sm">
-                        <span className="text-zinc-400">Creator</span>
-                        <span className="font-bold text-zinc-700">
-                            @{creatorName.replace('@', '')}
-                        </span>
-                    </div>
-
-                    <div className="flex justify-between items-center py-3 border-b border-zinc-100 text-sm">
                         <span className="text-zinc-400">Assigned</span>
-                        <span className="font-semibold text-zinc-700">
-                            @{assigneeName.replace('@', '')}
-                        </span>
+                        <div className="flex flex-col items-end gap-2">
+                            <select
+                                value={currentAssigneeValue}
+                                onChange={handleAssigneeSelectChange}
+                                disabled={isSavingAssignee}
+                                className="text-xs px-2 py-1.5 border border-zinc-200 rounded outline-none bg-zinc-50/50 text-zinc-700"
+                            >
+                                <option value="">Unassigned</option>
+                                {AUTH_USERS.map((user) => (
+                                    <option key={user.id} value={String(user.id)}>{user.username}</option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={handleAssignToMe}
+                                disabled={!canAssignToMe || isSavingAssignee}
+                                className="bg-zinc-100 text-zinc-700 border border-zinc-300 hover:bg-zinc-200 text-xs font-bold px-2.5 py-1.5 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Assign to me
+                            </button>
+                            {assigneeMessage && (
+                                <span className={`text-[11px] ${assigneeMessage.isError ? 'text-red-500' : 'text-emerald-600'}`}>
+                                    {assigneeMessage.text}
+                                </span>
+                            )}
+                        </div>
                     </div>
 
                     {/* REPARADO: SECCIÓN DE TAGS */}
