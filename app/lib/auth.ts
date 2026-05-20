@@ -37,11 +37,11 @@ export function getStoredUser() {
 }
 
 export function getStoredUsername() {
-  return getStoredUser()?.username;
+  return getStoredUser()?.username ?? null;
 }
 
 export function getStoredApiKey() {
-  return getStoredUser()?.apiKey;
+  return getStoredUser()?.apiKey ?? null;
 }
 
 export function setStoredUser(username: string) {
