@@ -32,7 +32,7 @@ export default function IssuesPage() {
     const [totalCount, setTotalCount] = useState<number>(0);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const [showFilters, setShowFilters] = useState<boolean>(true);
+    const [showFilters, setShowFilters] = useState<boolean>(false);
     const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
     const [typeCounts, setTypeCounts] = useState<BackendCounts>({});
@@ -129,7 +129,7 @@ export default function IssuesPage() {
 
                 }
             } catch (err) {
-                if (isMounted) setError(err instanceof Error ? err.message : 'Error de sincronización.');
+                if (isMounted) setError(err instanceof Error ? err.message : 'Sincronization error.');
             } finally {
                 if (isMounted) setLoading(false);
             }
@@ -218,7 +218,9 @@ export default function IssuesPage() {
                     <Link href="/issues/new" style={{ marginLeft: 'auto' }}>
                         <button style={{ padding: '10px 20px', backgroundColor: '#5dc5b5', color: '#fff', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', boxShadow: '0 3px 0 #469b8e' }}>+ NEW ISSUE</button>
                     </Link>
-                    <button style={{ padding: '10px 18px', backgroundColor: '#d1d5db', color: '#374151', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #64748b' }}>BULK ADD</button>
+                    <Link href="/issues/new-bulk">
+                        <button style={{ padding: '10px 18px', backgroundColor: '#d1d5db', color: '#374151', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #64748b', cursor: 'pointer' }}>BULK ADD</button>
+                    </Link>
                     <button style={{ padding: '10px 18px', backgroundColor: '#d1d5db', color: '#374151', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #64748b' }}>SETTINGS</button>
                     <Link href={`/profile/${encodeURIComponent(currentUser)}`} style={{ textDecoration: 'none' }}>
                         <button style={{ padding: '10px 18px', backgroundColor: '#64748b', color: '#fff', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #475569', cursor: 'pointer' }}>PROFILE</button>
@@ -316,7 +318,7 @@ export default function IssuesPage() {
 
                     <main style={{ flexGrow: 1, backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', overflow: 'hidden' }}>
                         {loading ? (
-                            <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>Sincronizando con el servidor...</div>
+                            <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>Fetching issues...</div>
                         ) : error ? (
                                 <div style={{ padding: '60px', textAlign: 'center', color: '#b91c1c' }}>{error}</div>
                             ) : (

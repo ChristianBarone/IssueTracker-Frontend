@@ -83,14 +83,14 @@ export default function IssueDetailPage() {
     };
 
     const handleDeleteCommentClick = async (commentId: number) => {
-        if (confirm("¿Segur que vols esborrar aquest comentari?")) {
+        if (confirm("Are you sure you want to delete this comment?")) {
             const success = await deleteComment(commentId);
             if (success) loadData();
         }
     };
 
     const handleDeleteIssueClick = async () => {
-        if (confirm(" ¿Estas segur d'eliminar aquesta issue?")) {
+        if (confirm(" Are you sure you want to delete this issue?")) {
             const success = await deleteIssue(issueId);
             if (success) router.push('/issues');
         }
@@ -125,7 +125,12 @@ export default function IssueDetailPage() {
     };
 
     if (loading) return <div className="p-10 text-center text-zinc-400 font-medium">Loading issue data...</div>;
-    if (!issue) return <div className="p-10 text-center text-red-500 font-medium">Issue not found.</div>;
+    if (!issue) return <div className="flex flex-col gap-5 p-10 text-center text-red-500 font-medium">
+                            Issue not found.
+                            <Link href="/issues" className="text-[#4db6ac] hover:underline text-sm font-semibold">
+                                ← Back to issues
+                            </Link>
+                       </div>;
 
     const rawType = issue.issue_type || (issue as any).type;
     const sideAttributes = [

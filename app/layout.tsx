@@ -14,8 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Issue Tracker",
-  description: "Track, filter, and manage project issues.",
+  title: "ASW Issue Tracker",
 };
 
 export default function RootLayout({
