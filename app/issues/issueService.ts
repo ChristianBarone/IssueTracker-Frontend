@@ -63,6 +63,19 @@ export async function getFilteredIssues(filters: IssueFilterState, apiKey: strin
         filters.issue_severity.forEach(s => params.append('issue_severity', s));
         filters.priority.forEach(p => params.append('priority', p));
         filters.status.forEach(st => params.append('status', st));
+        filters.assigned_to.forEach(a => {
+            let idToSend = a;
+
+            if (a === 'Andreu-Caro') idToSend = '3';
+            else if (a == 'adminUser') idToSend = '1'
+            else if (a === 'Marti-Piris') idToSend = '2';
+            else if (a === 'Hala-Alkhatib') idToSend = '4';
+            else if (a === 'Aleks-Shahverdyan') idToSend = '5';
+            else if (a === 'Christian-Alejandro-Barone') idToSend = '6';
+            else if (a === 'Unassigned') idToSend = 'unassigned'; // O como maneje Django los vacíos
+
+            params.append('assigned_to', idToSend);
+        });
 
         const url = `${baseUrl}/issues/?${params.toString()}`;
 

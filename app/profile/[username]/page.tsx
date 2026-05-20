@@ -93,18 +93,30 @@ function IssueRow({ issue }: { issue: ProfileIssue }) {
     );
 }
 
-function CommentRow({ comment }: { comment: { id: number; author: string; body: string; created_at: string } }) {
+function CommentRow({comment}: { comment: { id: number; issue_id?: number; author: string; body: string; created_at: string }
+}) {
+    const targetIssueId = comment.issue_id ?? comment.id;
+
     return (
-        <div className="rounded-[14px] border border-slate-200 bg-white px-4 py-4 shadow-[0_1px_0_rgba(15,23,42,0.02)]">
-            <div className="text-sm font-bold text-[#1784a8]">@{comment.author}</div>
+        <Link
+            href={`/issues/${targetIssueId}`}
+            className="block rounded-[14px] border border-slate-200 bg-white px-4 py-4 shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-all hover:border-slate-300 hover:shadow-[0_4px_12px_rgba(15,23,42,0.04)] active:scale-[0.99]"
+        >
+            <div className="flex items-center justify-between">
+                <div className="text-sm font-bold text-[#1784a8]">@{comment.author}</div>
+                <span className="text-[11px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
+                    View Issue #{targetIssueId}
+                </span>
+            </div>
             <p className="mt-2 text-sm leading-6 text-slate-700">{truncate(comment.body, 160)}</p>
             <small className="mt-2 block text-xs text-slate-500">{formatDateTime(comment.created_at)}</small>
-        </div>
+        </Link>
     );
 }
 
 type ProfileComment = {
     id: number;
+    issue_id?: number;
     author: string;
     body: string;
     created_at: string;
