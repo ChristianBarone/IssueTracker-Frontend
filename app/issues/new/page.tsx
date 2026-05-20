@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function CreateIssuePage() {
@@ -26,14 +26,12 @@ export default function CreateIssuePage() {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const target = e.target as HTMLInputElement;
 
-        // Si es un input file, capturar los archivos
         if (target.type === 'file' && target.files) {
             setFormData({
                 ...formData,
                 files: Array.from(target.files)
             });
         } else {
-            // Para otros inputs, capturar el valor como string
             setFormData({
                 ...formData,
                 [e.target.name]: e.target.value
@@ -41,7 +39,7 @@ export default function CreateIssuePage() {
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.SubmitEvent) => {
         e.preventDefault();
         setLoading(true);
         setStatusMessage(null);
@@ -70,7 +68,6 @@ export default function CreateIssuePage() {
                 dataEnvelope.append('assignee', formData.assigned_to);
             }
 
-            // Agregar archivos (pueden ser múltiples)
             formData.files.forEach(file => {
                 dataEnvelope.append('files', file);
             });

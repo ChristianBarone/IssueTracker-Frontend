@@ -100,6 +100,21 @@ export async function deleteComment(commentId: number): Promise<boolean> {
     }
 }
 
+// Añadir attachment
+export async function addAttachment(issueId: number): Promise<boolean> {
+    try {
+        const res = await fetch(`${BASE_URL}/issues/${issueId}/attachments`, {
+            method: 'POST',
+            headers: getHeaders(),
+        });
+        return res.ok;
+    } catch (error) {
+        console.error("Error adding attachment:", error);
+        return false;
+    }
+}
+
+
 // Eliminar attachment
 export async function deleteAttachment(attachmentId: number): Promise<boolean> {
     try {

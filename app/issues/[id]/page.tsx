@@ -29,6 +29,8 @@ export default function IssueDetailPage() {
     const [isEditingSubject, setIsEditingSubject] = useState(false);
     const [subjectInput, setSubjectInput] = useState('');
 
+    const [attachment, setAttachment] = useState(null as unknown as File)
+
     const loadData = async () => {
         if (!issueId) return;
         const data = await fetchIssueDetail(issueId);
@@ -52,7 +54,7 @@ export default function IssueDetailPage() {
         }
     };
 
-    const handlePublishComment = async (e: React.FormEvent) => {
+    const handlePublishComment = async (e: React.SubmitEvent) => {
         e.preventDefault();
         if (!newCommentBody.trim()) return;
         const success = await addComment(issueId, newCommentBody);
@@ -84,6 +86,45 @@ export default function IssueDetailPage() {
             if (success) router.push('/issues');
         }
     };
+
+    const handleAddAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        try {
+            const body = new FormData();
+
+            .forEach(file => {
+                body.append('files', file);
+            });
+
+            body.append('files', Array.from(e.target?.files));
+
+            const response = await fetch('https://issuetracker-ff8u.onrender.com/issues/', {
+                method: 'POST',
+                headers: {
+                    'Authorization': getApiKey()
+                },
+                body: dataEnvelope
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (response.ok) {
+                setStatusMessage({ text: `Successfully created issue #${data.id}!`, isError: false });
+                router.push('/issues');
+            } else {
+                console.error("Detalle del error de Django:", data);
+                setStatusMessage({
+                    text: data.error || data.message || 'Error del servidor al validar los campos.',
+                    isError: true
+                });
+            }
+        } catch {
+            setStatusMessage({ text: 'Error de connexió amb el Back-End.', isError: true });
+        } finally {
+            setLoading(false);
+        }
+    };
+        if (success) await loadData();
+    }
 
     const handleDeleteAttachmentClick= async (attachmentId: number) => {
         const success = await deleteAttachment(attachmentId)
@@ -168,13 +209,13 @@ export default function IssueDetailPage() {
                                         onChange={(e) => setSubjectInput(e.target.value)}
                                         className="w-full px-3 py-1.5 text-2xl font-bold border border-zinc-300 rounded outline-none focus:border-[#4db6ac]"
                                     />
-                                    <button onClick={handleSaveSubject} className="bg-[#4db6ac] text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-[#3ca398]">Save</button>
-                                    <button onClick={() => setIsEditingSubject(false)} className="bg-zinc-200 text-zinc-600 px-4 py-1.5 rounded text-sm font-medium hover:bg-zinc-300">Cancel</button>
+                                    <button onClick={handleSaveSubject} className="bg-[#4db6ac] text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-[#3ca398] cursor-pointer">Save</button>
+                                    <button onClick={() => setIsEditingSubject(false)} className="bg-zinc-200 text-zinc-600 px-4 py-1.5 rounded text-sm font-medium hover:bg-zinc-300 cursor-pointer">Cancel</button>
                                 </div>
                             ) : (
                                 <h1 className="text-3xl font-bold text-[#2c3e50] flex items-center gap-3">
                                     {issue.subject}
-                                    <span onClick={() => setIsEditingSubject(true)} className="cursor-pointer text-base text-zinc-400 hover:text-zinc-600" title="Edit Subject">✎</span>
+                                    <button onClick={() => setIsEditingSubject(true)} className="cursor-pointer text-base text-zinc-400 hover:text-zinc-600" title="Edit Subject">✎</button>
                                 </h1>
                             )}
                         </div>
@@ -203,6 +244,8 @@ export default function IssueDetailPage() {
                         <div className="mt-6">
                             <h3 className="text-sm font-bold text-[#2c3e50] mb-3">
                                 {issue.attachments?.length || 0} {(issue.attachments?.length === 1) ? 'Attachment' : 'Attachments'}
+                                <input type="file" id="files" onChange={() => handleAddAttachment()} hidden></input>
+                                <label className="btn-add-file" htmlFor="files">+</label>
                             </h3>
                             {issue.attachments?.length === 0 ?
                                 ''
@@ -210,11 +253,13 @@ export default function IssueDetailPage() {
                                     className="flex flex-col gap-2 p-2.5 bg-zinc-50 rounded border border-zinc-200/80 text-sm">
                                     {issue.attachments?.map(att => (
                                         <div key={att.id} className="flex flex-row justify-between items-center">
-                                            <a href={att.file_url} target="_blank" rel="noreferrer"
+                                            <a href={att.url} target="_blank" rel="noreferrer"
                                                className="text-[#4db6ac] hover:underline font-medium cursor-pointer">{att.name}</a>
-                                            <button onClick={() => handleDeleteAttachmentClick(att.id)}
-                                                    className="cursor-pointer w-8.5 border-2 border-red-500 text-red-500 font-bold p-1.25 transition duration-200 hover:bg-red-500 hover:text-white">X
-                                            </button>
+                                            {att.creator_id === CURRENT_USER_ID ?
+                                                <button onClick={() => handleDeleteAttachmentClick(att.id)}
+                                                        className="cursor-pointer w-7.75 border-2 border-red-500 text-red-500 font-bold p-1 transition duration-200 hover:bg-red-500 hover:text-white">X
+                                                </button>
+                                            : ''}
                                         </div>
                                     ))}
                                 </div>
@@ -225,18 +270,18 @@ export default function IssueDetailPage() {
                     {/* COMENTARIOS / ACTIVIDADES */}
                     <div className="bg-white p-6 rounded-lg shadow-sm border border-zinc-200/60">
                         <div className="flex gap-6 border-b border-zinc-200 mb-6">
-                            <span
+                            <button
                                 onClick={() => setActiveTab('comments')}
                                 className={`pb-2.5 cursor-pointer font-bold text-sm transition-colors ${activeTab === 'comments' ? 'text-[#4db6ac] border-b-2 border-[#4db6ac]' : 'text-zinc-400 hover:text-zinc-600'}`}
                             >
                                 {issue.comments?.length || 0} Comments
-                            </span>
-                            <span
+                            </button>
+                            <button
                                 onClick={() => setActiveTab('activities')}
                                 className={`pb-2.5 cursor-pointer font-bold text-sm transition-colors ${activeTab === 'activities' ? 'text-[#4db6ac] border-b-2 border-[#4db6ac]' : 'text-zinc-400 hover:text-zinc-600'}`}
                             >
                                 {issue.activities?.length || 0} Activities
-                            </span>
+                            </button>
                         </div>
 
                         {activeTab === 'activities' ? (
@@ -274,7 +319,7 @@ export default function IssueDetailPage() {
                                         required
                                     />
                                     <div className="text-right mt-2">
-                                        <button type="submit" className="bg-[#4db6ac] text-white px-5 py-2 rounded font-bold text-xs tracking-wider uppercase hover:bg-[#3ca398] transition-colors">
+                                        <button type="submit" className="bg-[#4db6ac] text-white px-5 py-2 rounded font-bold text-xs tracking-wider uppercase hover:bg-[#3ca398] transition-colors cursor-pointer">
                                             PUBLISH
                                         </button>
                                     </div>
@@ -306,8 +351,8 @@ export default function IssueDetailPage() {
                                                             rows={2}
                                                         />
                                                         <div className="mt-2 flex gap-3 justify-end items-center">
-                                                            <span onClick={() => setEditingCommentId(null)} className="cursor-pointer text-zinc-400 hover:text-zinc-600 text-xs font-medium">Cancelar</span>
-                                                            <button onClick={() => handleSaveCommentEdit(com.id)} className="bg-[#4db6ac] text-white px-3 py-1 rounded text-xs font-bold hover:bg-[#3ca398]">GUARDAR</button>
+                                                            <button onClick={() => setEditingCommentId(null)} className="cursor-pointer text-zinc-400 hover:text-zinc-600 text-xs font-medium">Cancelar</button>
+                                                            <button onClick={() => handleSaveCommentEdit(com.id)} className="cursor-pointer bg-[#4db6ac] text-white px-3 py-1 rounded text-xs font-bold hover:bg-[#3ca398]">GUARDAR</button>
                                                         </div>
                                                     </div>
                                                 ) : (
@@ -317,8 +362,8 @@ export default function IssueDetailPage() {
                                                         {/* Botones visibles únicamente para el dueño real del comentario */}
                                                         {isMyComment && (
                                                             <div className="mt-3 flex gap-4 text-xs font-bold border-t border-zinc-100 pt-2">
-                                                                <span onClick={() => { setEditingCommentId(com.id); setEditingCommentBody(com.body); }} className="text-[#4db6ac] cursor-pointer hover:underline">Editar</span>
-                                                                <span onClick={() => handleDeleteCommentClick(com.id)} className="text-red-500 cursor-pointer hover:underline">Eliminar</span>
+                                                                <button onClick={() => { setEditingCommentId(com.id); setEditingCommentBody(com.body); }} className="text-[#4db6ac] cursor-pointer hover:underline">Editar</button>
+                                                                <button onClick={() => handleDeleteCommentClick(com.id)} className="text-red-500 cursor-pointer hover:underline">Eliminar</button>
                                                             </div>
                                                         )}
                                                     </>
@@ -336,7 +381,7 @@ export default function IssueDetailPage() {
                 </div>
 
                 {/* BARRA LATERAL DERECHA (DETAILS) */}
-                <div className="w-full lg:w-80 flex-shrink-0 bg-white p-5 rounded-lg shadow-sm border border-zinc-200/60 h-fit">
+                <div className="w-full lg:w-80 shrink-0 bg-white p-5 rounded-lg shadow-sm border border-zinc-200/60 h-fit">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-4">DETAILS</h4>
 
                     {sideAttributes.map(attr => (
