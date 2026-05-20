@@ -38,15 +38,18 @@ export default function IssueDetailPage() {
     };
 
     useEffect(() => {
-        loadData();
+        if (issueId) {
+            loadData();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [issueId]);
 
     useEffect(() => {
-        const storedUser = getStoredUsername();
+        const storedUser = getStoredUsername() ?? null;
         setCurrentUser(storedUser);
 
         const onStorage = () => {
-            const nextUser = getStoredUsername();
+            const nextUser = getStoredUsername() ?? null;
             setCurrentUser(nextUser);
         };
 
@@ -90,7 +93,7 @@ export default function IssueDetailPage() {
     };
 
     const handleDeleteIssueClick = async () => {
-        if (confirm(" Are you sure you want to delete this issue?")) {
+        if (confirm("Are you sure you want to delete this issue?")) {
             const success = await deleteIssue(issueId);
             if (success) router.push('/issues');
         }
@@ -126,30 +129,57 @@ export default function IssueDetailPage() {
 
     if (loading) return <div className="p-10 text-center text-zinc-400 font-medium">Loading issue data...</div>;
     if (!issue) return <div className="flex flex-col gap-5 p-10 text-center text-red-500 font-medium">
-                            Issue not found.
-                            <Link href="/issues" className="text-[#4db6ac] hover:underline text-sm font-semibold">
-                                ← Back to issues
-                            </Link>
-                       </div>;
+        Issue not found.
+        <Link href="/issues" className="text-[#4db6ac] hover:underline text-sm font-semibold">
+            ← Back to issues
+        </Link>
+    </div>;
 
-    const rawType = issue.issue_type || (issue as any).type;
+    const issueExt = issue as unknown as {
+        type?: { name?: string; color?: string };
+        priority?: { name?: string; color?: string };
+        tags?: Array<{ id: number; name: string } | string>;
+        watchers?: Array<{ id: number; username: string } | string>;
+    };
+
+    const rawType = issue.issue_type || issueExt.type;
+
     const sideAttributes = [
         {
             label: 'Type',
             name: typeof rawType === 'string' ? rawType : rawType?.name || 'None',
-            color: rawType?.color || getColorFallback('Type', typeof rawType === 'string' ? rawType : rawType?.name || '')
+            color: (typeof rawType !== 'string' && rawType?.color) || getColorFallback('Type', typeof rawType === 'string' ? rawType : rawType?.name || '')
         },
         {
             label: 'Severity',
             name: typeof issue.severity === 'string' ? issue.severity : issue.severity?.name || 'None',
-            color: issue.severity?.color || getColorFallback('Severity', typeof issue.severity === 'string' ? issue.severity : issue.severity?.name || '')
+            color: (typeof issue.severity !== 'string' && issue.severity?.color) || getColorFallback('Severity', typeof issue.severity === 'string' ? issue.severity : issue.severity?.name || '')
         },
         {
             label: 'Priority',
-            name: typeof issue.priority === 'string' ? issue.priority : (issue.priority as any)?.name || 'None',
-            color: (issue.priority as any)?.color || getColorFallback('Priority', typeof issue.priority === 'string' ? issue.priority : (issue.priority as any)?.name || '')
+            name: typeof issue.priority === 'string' ? issue.priority : (issue.priority as typeof issueExt.priority)?.name || 'None',
+            color: (typeof issue.priority !== 'string' && (issue.priority as typeof issueExt.priority)?.color) || getColorFallback('Priority', typeof issue.priority === 'string' ? issue.priority : (issue.priority as typeof issueExt.priority)?.name || '')
         }
     ];
+
+    let creatorName = 'unknown';
+    if (issue.creator) {
+        if (typeof issue.creator === 'string') creatorName = issue.creator;
+        else if (typeof issue.creator === 'object' && 'username' in issue.creator) creatorName = (issue.creator as { username: string }).username;
+    }
+
+    let assigneeName = 'Unassigned';
+    if (issue.assignee) {
+        if (typeof issue.assignee === 'string') assigneeName = issue.assignee;
+        else if (typeof issue.assignee === 'object' && 'username' in issue.assignee) assigneeName = (issue.assignee as { username: string }).username;
+    }
+
+    const currentTags = issueExt.tags || [];
+    const currentWatchers = issueExt.watchers || [];
+
+    const cleanCreator = creatorName.replace('@', '').trim().toLowerCase();
+    const cleanCurrentUser = (currentUser ?? '').replace('@', '').trim().toLowerCase();
+    const isMyIssue = currentUser && cleanCreator === cleanCurrentUser;
 
     return (
         <div className="min-h-screen bg-[#f4f7f9] text-[#333] font-sans py-10 px-6">
@@ -189,7 +219,7 @@ export default function IssueDetailPage() {
                         </p>
                     </div>
 
-                    {/* DESCRIPCIÓ */}
+                    {/* DESCRIPCIÓN */}
                     <div className="bg-white p-6 rounded-lg shadow-sm border border-zinc-200/60 mb-6">
                         <div className="mb-4">
                             <span
@@ -281,11 +311,8 @@ export default function IssueDetailPage() {
                                 {/* LISTA DE COMENTARIOS */}
                                 <div className="flex flex-col gap-4">
                                     {issue.comments?.map(com => {
-                                        // Limpiamos los nombres quitando espacios y el símbolo '@'
                                         const cleanAuthor = com.author?.replace('@', '').trim().toLowerCase() || '';
                                         const cleanCurrentUser = (currentUser ?? '').replace('@', '').trim().toLowerCase();
-
-                                        // Si el autor del comentario coincide con el usuario activo, activamos los permisos
                                         const isMyComment = cleanAuthor === cleanCurrentUser;
 
                                         return (
@@ -304,7 +331,7 @@ export default function IssueDetailPage() {
                                                             rows={2}
                                                         />
                                                         <div className="mt-2 flex gap-3 justify-end items-center">
-                                                            <span onClick={() => setEditingCommentId(null)} className="cursor-pointer text-zinc-400 hover:text-zinc-600 text-xs font-medium">Cancelar</span>
+                                                            <span onClick={() => { setEditingCommentId(null); }} className="cursor-pointer text-zinc-400 hover:text-zinc-600 text-xs font-medium">Cancelar</span>
                                                             <button onClick={() => handleSaveCommentEdit(com.id)} className="bg-[#4db6ac] text-white px-3 py-1 rounded text-xs font-bold hover:bg-[#3ca398]">GUARDAR</button>
                                                         </div>
                                                     </div>
@@ -312,7 +339,6 @@ export default function IssueDetailPage() {
                                                     <>
                                                         <p className="text-sm text-zinc-700 whitespace-pre-wrap">{com.body}</p>
 
-                                                        {/* Botones visibles únicamente para el dueño real del comentario */}
                                                         {isMyComment && (
                                                             <div className="mt-3 flex gap-4 text-xs font-bold border-t border-zinc-100 pt-2">
                                                                 <span onClick={() => { setEditingCommentId(com.id); setEditingCommentBody(com.body); }} className="text-[#4db6ac] cursor-pointer hover:underline">Editar</span>
@@ -357,25 +383,75 @@ export default function IssueDetailPage() {
                     <div className="flex justify-between items-center py-3 border-b border-zinc-100 text-sm">
                         <span className="text-zinc-400">Creator</span>
                         <span className="font-bold text-zinc-700">
-                            {issue.creator?.username ? `@${issue.creator.username}` : '@unknown'}
+                            @{creatorName.replace('@', '')}
+                        </span>
+                    </div>
+
+                    <div className="flex justify-between items-center py-3 border-b border-zinc-100 text-sm">
+                        <span className="text-zinc-400">Deadline</span>
+                        <span className="font-semibold text-zinc-700">
+                            {issue.deadline ? new Date(issue.deadline).toLocaleDateString('en-GB') : 'No date'}
+                        </span>
+                    </div>
+
+                    <div className="flex justify-between items-center py-3 border-b border-zinc-100 text-sm">
+                        <span className="text-zinc-400">Creator</span>
+                        <span className="font-bold text-zinc-700">
+                            @{creatorName.replace('@', '')}
                         </span>
                     </div>
 
                     <div className="flex justify-between items-center py-3 border-b border-zinc-100 text-sm">
                         <span className="text-zinc-400">Assigned</span>
                         <span className="font-semibold text-zinc-700">
-                            {issue.assignee?.username ? `@${issue.assignee.username}` : 'Unassigned'}
+                            @{assigneeName.replace('@', '')}
                         </span>
                     </div>
 
-                    <div className="mt-8">
-                        <button
-                            onClick={handleDeleteIssueClick}
-                            className="w-full py-2.5 bg-white text-red-500 border border-red-500 rounded font-bold text-xs tracking-wider uppercase transition-all hover:bg-red-500 hover:text-white cursor-pointer"
-                        >
-                            DELETE ISSUE
-                        </button>
+                    {/* REPARADO: SECCIÓN DE TAGS */}
+                    <div className="mt-6 pt-4 border-t border-zinc-100">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3">TAGS</h4>
+                        <div className="flex flex-wrap gap-1.5 mb-3">
+                            {currentTags.map((tag, idx) => {
+                                const tagName = typeof tag === 'string' ? tag : tag.name;
+                                return (
+                                    <span key={typeof tag === 'string' ? idx : tag.id} className="bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded text-xs font-medium border border-zinc-200/60">
+                                        {tagName}
+                                    </span>
+                                );
+                            })}
+                            {currentTags.length === 0 && <span className="text-xs text-zinc-400 italic">No tags</span>}
+                        </div>
+                        <div className="flex gap-1">
+                            <select className="flex-1 text-xs px-2 py-1.5 border border-zinc-200 rounded outline-none bg-zinc-50/50 text-zinc-600">
+                                <option>Test tag</option>
+                            </select>
+                            <button className="bg-[#4db6ac] text-white text-xs font-bold px-3 py-1 rounded hover:bg-[#3ca398]">+ Add</button>
+                        </div>
                     </div>
+
+                    {/* REPARADO: SECCIÓN DE WATCHERS */}
+                    <div className="mt-6 pt-4 border-t border-zinc-100">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3">WATCHERS ({currentWatchers.length})</h4>
+                        <div className="flex gap-1">
+                            <select className="flex-1 text-xs px-2 py-1.5 border border-zinc-200 rounded outline-none bg-zinc-50/50 text-zinc-600">
+                                <option>Add user...</option>
+                            </select>
+                            <button className="bg-zinc-100 text-zinc-600 border border-zinc-300 hover:bg-zinc-200 text-xs font-bold px-2.5 rounded">+</button>
+                        </div>
+                    </div>
+
+                    {/* EL BOTÓN SOLO SE RENDERIZA SI EL USUARIO LOGUEADO ES EL CREADOR */}
+                    {isMyIssue && (
+                        <div className="mt-8">
+                            <button
+                                onClick={handleDeleteIssueClick}
+                                className="w-full py-2.5 bg-white text-red-500 border border-red-500 rounded font-bold text-xs tracking-wider uppercase transition-all hover:bg-red-500 hover:text-white cursor-pointer"
+                            >
+                                DELETE ISSUE
+                            </button>
+                        </div>
+                    )}
                 </div>
 
             </div>
