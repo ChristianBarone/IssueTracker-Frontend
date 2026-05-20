@@ -18,7 +18,44 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
             cache: 'no-store' // Para que siempre traiga comentarios frescos
         });
         if (!res.ok) return null;
-        return await res.json();
+        const raw = await res.json();
+
+        // Normalize common backend variations so the UI has consistent shapes
+        const normalizeUser = (u: any) => {
+            if (!u) return null;
+            if (typeof u === 'string') return { id: 0, username: u.replace('@', '') };
+            if (u.username) return u;
+            return null;
+        };
+
+        const normalizeField = (f: any) => {
+            if (!f) return null;
+            if (typeof f === 'string') return { id: 0, name: f };
+            if (f.name) return f;
+            return null;
+        };
+
+        const normalized: IssueDetailData = {
+            id: Number(raw.id),
+            subject: raw.subject || '',
+            description: raw.description ?? null,
+            issue_type: normalizeField(raw.issue_type || raw.type),
+            severity: normalizeField(raw.severity),
+            priority: normalizeField(raw.priority || raw.issue_priority) || (raw.priority ? { id: 0, name: String(raw.priority) } : null),
+            status: normalizeField(raw.status),
+            creator: normalizeUser(raw.creator) || { id: 0, username: (raw.creator_name || raw.author || 'unknown') },
+            assignee: normalizeUser(raw.assignee || raw.assigned_to) || null,
+            deadline: raw.deadline ?? null,
+            created_at: raw.created_at || raw.created || new Date().toISOString(),
+            modified_at: raw.modified_at || raw.modified || raw.updated_at || new Date().toISOString(),
+            attachments: Array.isArray(raw.attachments) ? raw.attachments : [],
+            comments: Array.isArray(raw.comments) ? raw.comments : [],
+            activities: Array.isArray(raw.activities) ? raw.activities : [],
+            tags: Array.isArray(raw.tags) ? raw.tags : [],
+            watchers: Array.isArray(raw.watchers) ? raw.watchers : []
+        };
+
+        return normalized;
     } catch (error) {
         console.error("Error fetching issue details:", error);
         return null;
