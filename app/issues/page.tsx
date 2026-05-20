@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getFilteredIssues, updateIssueStatus, IssueFilterState, IssueListResult } from './issueService';
-import { getStoredApiKey, getStoredUser } from '../lib/auth';
+import { getStoredApiKey, getStoredUsername } from '../lib/auth';
 
 interface IssueField {
     name: string;
@@ -53,7 +53,7 @@ export default function IssuesPage() {
     });
 
     const apiKey = getStoredApiKey();
-    const currentUser = getStoredUser() ?? 'Andreu-Caro';
+    const currentUser = getStoredUsername() ?? 'Andreu-Caro';
 
     const handleSort = (field: string) => {
         setFilters(prev => {

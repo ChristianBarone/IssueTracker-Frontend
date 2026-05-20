@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
 import { getApiBaseUrl } from '../../lib/apiBaseUrl';
-import { getStoredApiKey, HARD_CODED_USERS } from '../../lib/auth';
+import { getStoredApiKey, USERNAMES } from '../../lib/auth';
 
 export default function CreateIssuePage() {
     const router = useRouter();
@@ -196,7 +196,7 @@ export default function CreateIssuePage() {
                                 className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
                             >
                                 <option value="Unassigned">Unassigned</option>
-                                {HARD_CODED_USERS.map((user) => (
+                                {USERNAMES.map((user) => (
                                     <option key={user} value={user}>{user}</option>
                                 ))}
                             </select>

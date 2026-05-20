@@ -1,7 +1,5 @@
 import { fetchWithTimeout } from "../lib/fetchWithTimeout";
-
-const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-const BASE_URL = isLocalhost ? 'http://localhost:8000' : 'https://issuetracker-ff8u.onrender.com';
+import { getApiBaseUrl } from "../lib/apiBaseUrl";
 
 export interface ProfileIssue {
     id: number;
@@ -57,7 +55,7 @@ export interface ProfileData {
 export async function fetchProfile(username: string, apiKey: string): Promise<ProfileData> {
     // Try once, and retry once on abort/timeout errors
     try {
-        const response = await fetchWithTimeout(`${BASE_URL}/profile/${encodeURIComponent(username)}`, {
+        const response = await fetchWithTimeout(`${getApiBaseUrl()}/profile/${encodeURIComponent(username)}`, {
             method: 'GET',
             headers: {
                 Authorization: apiKey,
@@ -77,7 +75,7 @@ export async function fetchProfile(username: string, apiKey: string): Promise<Pr
         if (msg.includes('aborted') || msg.includes('timed out')) {
             // transient abort — retry once
             await new Promise((r) => setTimeout(r, 500));
-            const response = await fetchWithTimeout(`${BASE_URL}/profile/${encodeURIComponent(username)}`, {
+            const response = await fetchWithTimeout(`${getApiBaseUrl()}/profile/${encodeURIComponent(username)}`, {
                 method: 'GET',
                 headers: {
                     Authorization: apiKey,
@@ -111,7 +109,7 @@ export async function updateProfile(
     }
 
     try {
-        const response = await fetchWithTimeout(`${BASE_URL}/profile/${encodeURIComponent(username)}`, {
+        const response = await fetchWithTimeout(`${getApiBaseUrl()}/profile/${encodeURIComponent(username)}`, {
             method: 'PUT',
             headers: {
                 Authorization: apiKey
@@ -130,7 +128,7 @@ export async function updateProfile(
         const msg = err?.message ?? String(err);
         if (msg.includes('aborted') || msg.includes('timed out')) {
             await new Promise((r) => setTimeout(r, 500));
-            const response = await fetchWithTimeout(`${BASE_URL}/profile/${encodeURIComponent(username)}`, {
+            const response = await fetchWithTimeout(`${getApiBaseUrl()}/profile/${encodeURIComponent(username)}`, {
                 method: 'PUT',
                 headers: {
                     Authorization: apiKey

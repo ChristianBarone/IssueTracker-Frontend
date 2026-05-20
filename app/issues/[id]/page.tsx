@@ -8,7 +8,7 @@ import {
     addComment, editComment, deleteComment
 } from './detailService';
 import { IssueDetailData } from './types';
-import { getStoredUser } from '../../lib/auth';
+import { getStoredUsername } from '../../lib/auth';
 
 export default function IssueDetailPage() {
     const { id } = useParams();
@@ -42,16 +42,16 @@ export default function IssueDetailPage() {
     }, [issueId]);
 
     useEffect(() => {
-        const storedUser = getStoredUser();
+        const storedUser = getStoredUsername();
         setCurrentUser(storedUser);
 
         const onStorage = () => {
-            const nextUser = getStoredUser();
+            const nextUser = getStoredUsername();
             setCurrentUser(nextUser);
         };
 
-        window.addEventListener('storage', onStorage);
-        return () => window.removeEventListener('storage', onStorage);
+        globalThis.addEventListener('storage', onStorage);
+        return () => globalThis.removeEventListener('storage', onStorage);
     }, []);
 
     const handleSaveSubject = async () => {

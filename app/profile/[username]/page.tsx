@@ -253,7 +253,7 @@ export default function ProfilePage() {
                                         onClick={async () => {
                                             await navigator.clipboard.writeText(profile.auth_key || '');
                                         }}
-                                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left font-mono text-xs text-slate-700 transition-colors hover:bg-slate-100"
+                                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left font-mono text-xs text-slate-700 transition-colors hover:bg-slate-100 cursor-pointer"
                                     >
                                         {profile.auth_key}
                                     </button>
@@ -283,7 +283,7 @@ export default function ProfilePage() {
                                     <button
                                         type="button"
                                         onClick={handleSwitchUser}
-                                        className="inline-flex min-h-12 items-center justify-center rounded-lg bg-[#fef2f2] px-4 font-bold text-[#991b1b] shadow-[0_4px_0_#fecaca] transition-transform hover:-translate-y-px"
+                                        className="inline-flex min-h-12 items-center justify-center rounded-lg bg-[#fef2f2] px-4 font-bold text-[#991b1b] shadow-[0_4px_0_#fecaca] transition-transform hover:-translate-y-px cursor-pointer"
                                     >
                                         SWITCH USER
                                     </button>

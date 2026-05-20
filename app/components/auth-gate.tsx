@@ -1,27 +1,27 @@
 'use client';
 
-import type { FormEvent, ReactNode } from 'react';
+import type { SubmitEvent, ReactNode } from 'react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  HARD_CODED_USERS,
-  getStoredUser,
+  getStoredUsername,
   setStoredUser,
-  fetchGeneratedApiKey
+  AUTH_USERS,
+  USERNAMES,
 } from '../lib/auth';
 
 function subscribeToAuthStorage(onStoreChange: () => void) {
-  if (typeof window === 'undefined') return () => {};
+  if (globalThis.window === undefined) return () => {};
 
-  window.addEventListener('storage', onStoreChange);
-  return () => window.removeEventListener('storage', onStoreChange);
+  globalThis.addEventListener('storage', onStoreChange);
+  return () => globalThis.removeEventListener('storage', onStoreChange);
 }
 
-export default function AuthGate({ children }: { children: ReactNode }) {
+export default function AuthGate({ children }: Readonly<{ children: ReactNode }>) {
   const router = useRouter();
   const pathname = usePathname();
-  const currentUser = useSyncExternalStore(subscribeToAuthStorage, getStoredUser, () => null);
-  const [selectedUser, setSelectedUser] = useState(() => currentUser ?? HARD_CODED_USERS[0]);
+  const currentUser = useSyncExternalStore(subscribeToAuthStorage, getStoredUsername, () => null);
+  const [selectedUser, setSelectedUser] = useState(() => currentUser ?? USERNAMES[0]);
   const [loginError, setLoginError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,13 +32,12 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     }
   }, [currentUser, pathname, router]);
 
-  const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSignIn = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoginError(null);
 
     try {
-      const authUser = await fetchGeneratedApiKey(selectedUser);
-      setStoredUser(authUser.username, authUser.apiKey);
+      setStoredUser(selectedUser);
       router.replace('/issues');
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : 'Failed to load user key');
@@ -48,7 +47,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
   if (!currentUser) {
     return (
       <main className="grid min-h-screen place-items-center px-4 py-10 text-slate-700" style={{ backgroundImage: 'radial-gradient(circle at top left, rgba(47, 147, 184, 0.18), transparent 28%), radial-gradient(circle at top right, rgba(93, 197, 181, 0.16), transparent 24%), linear-gradient(180deg, #f6f9fc 0%, #eef4f8 100%)' }}>
-        <div className="grid w-full max-w-[980px] gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="grid w-full max-w-245 gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <section className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white/80 p-8 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur">
             <div className="inline-flex rounded-full border border-[#2f93b8]/20 bg-[#2f93b8]/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.22em] text-[#2f93b8]">
               Issue Tracker Access
@@ -57,7 +56,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
               Choose a user and enter the tracker.
             </h1>
             <p className="mt-4 max-w-xl text-base leading-7 text-slate-600 md:text-lg">
-              This login uses five default users and loads each user's generated backend API key when you sign in.
+              This login uses five default users and loads each user&#39;s generated backend API key when you sign in.
             </p>
 
             <div className="mt-8 grid gap-3 text-sm text-slate-600 md:grid-cols-3">
@@ -91,10 +90,10 @@ export default function AuthGate({ children }: { children: ReactNode }) {
                 <select
                   value={selectedUser}
                   onChange={(event) => setSelectedUser(event.target.value)}
-                  className="h-12 rounded-[14px] border border-slate-700 bg-slate-900 px-4 text-base text-white outline-none transition-colors focus:border-[#5dc5b5]"
+                  className="h-12 rounded-[14px] border border-slate-700 bg-slate-900 px-4 text-base text-white outline-none transition-colors focus:border-[#5dc5b5] cursor-pointer"
                 >
-                  {HARD_CODED_USERS.map((user) => (
-                    <option key={user} value={user}>
+                  {USERNAMES.map((user) => (
+                    <option key={user} value={user} className="cursor-pointer">
                       {user}
                     </option>
                   ))}
@@ -107,7 +106,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
 
               <button
                 type="submit"
-                className="inline-flex h-12 items-center justify-center rounded-[14px] bg-gradient-to-b from-[#82e9de] to-[#59d8cc] px-5 font-bold text-slate-950 shadow-[0_6px_0_#40bbb1] transition-transform hover:-translate-y-px"
+                className="inline-flex h-12 items-center justify-center rounded-[14px] bg-gradient-to-b from-[#82e9de] to-[#59d8cc] px-5 font-bold text-slate-950 shadow-[0_6px_0_#40bbb1] transition-transform hover:-translate-y-px cursor-pointer"
               >
                 Continue to issues
               </button>

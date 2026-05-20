@@ -9,8 +9,8 @@ export function getApiBaseUrl() {
     return trimTrailingSlash(ENV_BASE_URL);
   }
 
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
+  if (globalThis.window !== undefined) {
+    const host = globalThis.location.hostname;
     if (host === 'localhost' || host === '127.0.0.1') {
       return 'http://localhost:8000';
     }
