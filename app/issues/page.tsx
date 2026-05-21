@@ -43,11 +43,10 @@ export default function IssuesPage() {
     const [statusCounts, setStatusCounts] = useState<BackendCounts>({});
     const [statuses, setStatuses] = useState<Array<{ name: string; color?: string }>>([]);
     const [assignedToCounts, setAssignedToCounts] = useState<BackendCounts>({});
-    const [localStatusChanges, setLocalStatusChanges] = useState<Record<number, string>>({});
 
     const [filters, setFilters] = useState<IssueFilterState>({
         search: '',
-        order_by: '-created_at',
+        order_by: '-subject',
         issue_type: [],
         issue_severity: [],
         priority: [],
