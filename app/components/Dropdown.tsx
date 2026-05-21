@@ -1,9 +1,7 @@
 import React, {useEffect, useRef, useState} from "react";
 import {AUTH_USERS} from "@/app/lib/auth";
 
-export const AssigneeDropdown = ({ value, onChange, disabled, users }: { value: string, onChange: (e: {
-        target: { value: string }
-    }) => Promise<void>, disabled?: boolean, users: typeof AUTH_USERS }) => {
+export const AssigneeDropdown = ({ value, onChange, disabled, users }: { value: string, onChange: any, disabled?: boolean, users: typeof AUTH_USERS }) => {
     const [open, setOpen] = useState(false);
     const buttonRef = useRef<HTMLButtonElement | null>(null);
 
