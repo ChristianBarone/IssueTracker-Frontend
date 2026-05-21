@@ -60,7 +60,7 @@ function orderIssues(parameter: string) {
         direction = -1
         parameter = parameter.substring(1)
     }
-    return function(a, b) {
+    return function(a: any, b: any) {
         if (parameter === "subject") {
             if (a["id"] > b["id"]) return direction
             if (a["id"] < b["id"]) return -1 * direction

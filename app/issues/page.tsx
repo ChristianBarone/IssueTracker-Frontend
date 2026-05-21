@@ -36,6 +36,7 @@ export default function IssuesPage() {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [showFilters, setShowFilters] = useState<boolean>(false);
+    const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
     const [typeCounts, setTypeCounts] = useState<BackendCounts>({});
     const [severityCounts, setSeverityCounts] = useState<BackendCounts>({});
@@ -168,7 +169,7 @@ export default function IssuesPage() {
         return () => {
             isMounted = false;
         };
-    }, []);
+    }, [refreshTrigger]);
 
     useEffect(() => {
         let isMounted = true;
@@ -199,7 +200,7 @@ export default function IssuesPage() {
         const success = await updateIssueFields(issueId, {deadline: ""});
 
         if (success) {
-            loadStatuses()
+            setRefreshTrigger(prev => prev + 1);
         } else {
             alert("No se pudo limpiar la fecha límite en el servidor.");
         }
