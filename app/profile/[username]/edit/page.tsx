@@ -161,7 +161,7 @@ export default function EditProfilePage() {
                                         type="file"
                                         accept="image/*"
                                         onChange={(event) => handleAvatarChange(event.target.files?.[0] || null)}
-                                        className="block w-full rounded-[12px] border border-slate-200 bg-white p-3 text-sm outline-none focus:border-[#2f93b8] focus:ring-2 focus:ring-[#2f93b8]/10"
+                                        className="block w-full rounded-[12px] border border-slate-200 bg-white p-3 text-sm outline-none focus:border-[#2f93b8] focus:ring-2 focus:ring-[#2f93b8]/10 cursor-pointer"
                                     />
                                     <div className="mt-2 text-sm text-slate-500">Upload a square image for best results.</div>
                                 </div>
@@ -182,14 +182,14 @@ export default function EditProfilePage() {
                                 <div className="flex justify-end gap-3">
                                     <Link
                                         href={`/profile/${encodeURIComponent(username)}`}
-                                        className="inline-flex items-center justify-center rounded-[10px] bg-slate-100 px-4 py-3 font-bold text-slate-700"
+                                        className="inline-flex items-center justify-center rounded-[10px] bg-slate-100 px-4 py-3 font-bold text-slate-700 cursor-pointer"
                                     >
                                         Cancel
                                     </Link>
                                     <button
                                         type="submit"
                                         disabled={saving}
-                                        className="inline-flex items-center justify-center rounded-[10px] bg-gradient-to-b from-[#82e9de] to-[#59d8cc] px-5 py-3 font-bold text-slate-900 shadow-[0_6px_0_#40bbb1] disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="inline-flex items-center justify-center rounded-[10px] bg-gradient-to-b from-[#82e9de] to-[#59d8cc] px-5 py-3 font-bold text-slate-900 shadow-[0_6px_0_#40bbb1] cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         {saving ? 'Saving…' : 'Save changes'}
                                     </button>

@@ -12,7 +12,7 @@ export const AUTH_USERS = [
   { id: 4, username: 'Hala-Alkhatib', key: '2dYzNAcecKbK15Zj2OJo4mbQVLTlSzBJ' },
   { id: 5, username: 'Aleks-Shahverdyan', key: 'wzkS4JLIQc836R4PAM6RcziMoTElN21G' },
   { id: 6, username: 'Christian-Alejandro-Barone', key: 'Yc8yGG2YVBNpeEzcSa5lHZrrkaiXAbRd' }
-] as const satisfies ReadonlyArray<AuthUser>;
+];
 
 export const USERNAMES = AUTH_USERS.map((user) => user.username);
 

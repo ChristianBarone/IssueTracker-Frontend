@@ -234,3 +234,18 @@ export async function createIssueBulk(list: string[]) {
         body: JSON.stringify({list})
     });
 }
+
+export async function updateIssueFields(id: number, fields: Record<string, unknown>): Promise<boolean> {
+    try {
+        const baseUrl = getApiBaseUrl();
+        const res = await fetchWithTimeout(`${baseUrl}/issues/${id}/`, {
+            method: 'PUT',
+            headers: getHeaders(),
+            body: JSON.stringify(fields),
+        });
+        return res.ok;
+    } catch (error) {
+        console.error("Error updating issue:", error);
+        return false;
+    }
+}

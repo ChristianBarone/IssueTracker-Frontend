@@ -1,8 +1,7 @@
-import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
-import { getStoredApiKey } from '../../lib/auth';
-import {getApiBaseUrl, getHeaders} from '../../lib/apiBaseUrl';
 import { IssueDetailData } from './types';
-import { getUserById, getUserByUsername } from '../../lib/auth';
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
+import { getApiBaseUrl, getHeaders} from '../../lib/apiBaseUrl';
+import { getStoredApiKey, getUserById, getUserByUsername } from '../../lib/auth';
 
 const baseUrl = getApiBaseUrl();
 
@@ -18,7 +17,7 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
         if (!res.ok) return null;
         const raw = (await res.json()) as Record<string, any>;
         // Debug: log raw backend response for assignee to help diagnose UI mismatch
-        try { console.debug('[fetchIssueDetail] raw assignee:', raw.assignee || raw.assigned_to); } catch {};
+        try { console.debug('[fetchIssueDetail] raw assignee:', raw.assignee || raw.assigned_to); } catch {}
 
         // Normalize user fields to plain username strings
         const normalizeUser = (u: unknown): string => {
@@ -64,8 +63,21 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
             attachments: Array.isArray(raw.attachments) ? raw.attachments as IssueDetailData['attachments'] : [],
             comments: Array.isArray(raw.comments) ? raw.comments as IssueDetailData['comments'] : [],
             activities: Array.isArray(raw.activities) ? raw.activities as IssueDetailData['activities'] : [],
-            tags: Array.isArray(raw.tags) ? raw.tags as IssueDetailData['tags'] : [],
-            watchers: Array.isArray(raw.watchers) ? (raw.watchers as unknown[]).map(normalizeWatcher) : [],
+            tags: Array.isArray(raw.tags) ? raw.tags.map((t: unknown): IssueDetailData['tags'][number] => {
+            if (typeof t === 'number') return { id: t, name: '', color: '' };
+            if (typeof t === 'object' && t !== null) {
+                const obj = t as Record<string, unknown>;
+                return {
+                    id: Number(obj.id ?? 0),
+                    name: String(obj.name ?? ''),
+                    color: String(obj.color ?? ''),
+                };
+            }
+            return { id: 0, name: String(t ?? ''), color: '' };
+        }) : [],
+            watchers: Array.isArray(raw.watchers)
+                ? raw.watchers.map(normalizeUser).filter(u => u !== null)
+                : [],
         };
 
         return normalized;
@@ -195,6 +207,35 @@ export async function deleteIssue(id: number): Promise<boolean> {
         return res.ok;
     } catch (error) {
         console.error("Error deleting issue:", error);
+        return false;
+    }
+}
+
+// Añadir watcher <userId> a issue <issueId>
+export async function addWatcher(issueId: number, userId: number): Promise<boolean> {
+    try {
+        const res = await fetchWithTimeout(`${baseUrl}/issues/${issueId}/watchers/`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ user_id: userId }),
+        });
+        return res.ok;
+    } catch (error) {
+        console.error("Error adding watcher:", error);
+        return false;
+    }
+}
+
+// Eliminar watcher <watcherId> de la issue <issueId>
+export async function deleteWatcher(issueId: number, watcherId: number): Promise<boolean> {
+    try {
+        const res = await fetchWithTimeout(`${baseUrl}/issues/${issueId}/watchers/${watcherId}`, { // <- Barra añadida aquí
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+        return res.ok;
+    } catch (error) {
+        console.error("Error deleting watcher:", error);
         return false;
     }
 }
