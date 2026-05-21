@@ -1,7 +1,7 @@
 // Default timeout: 30s. Can be overridden at build/runtime with NEXT_PUBLIC_API_TIMEOUT_MS.
 const DEFAULT_TIMEOUT_MS = (() => {
-    const env = typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? '') : '';
-    const parsed = parseInt(env, 10);
+    const env = typeof process === 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_TIMEOUT_MS ?? '');
+    const parsed = Number.parseInt(env, 10);
     if (!Number.isNaN(parsed) && parsed > 0) return parsed;
     return 30000;
 })();

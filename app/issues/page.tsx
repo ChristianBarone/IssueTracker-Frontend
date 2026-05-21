@@ -165,7 +165,7 @@ export default function IssuesPage() {
 
     const handleCheckboxChange = (category: keyof Omit<IssueFilterState, 'search' | 'order_by'>, value: string) => {
         setFilters(prev => {
-            const currentList = prev[category] as string[];
+            const currentList = prev[category];
             const updatedList = currentList.includes(value)
                 ? currentList.filter(item => item !== value)
                 : [...currentList, value];
@@ -228,7 +228,7 @@ export default function IssuesPage() {
 
     const getCountSafe = (countsObj: BackendCounts, key: string) => {
         if (!countsObj) return 0;
-        return countsObj[key] ?? (countsObj[key.toLowerCase()] !== undefined ? countsObj[key.toLowerCase()] : 0);
+        return countsObj[key] ?? (countsObj[key.toLowerCase()] === undefined ? 0 : countsObj[key.toLowerCase()]);
     };
 
     return (
@@ -384,9 +384,13 @@ export default function IssuesPage() {
                     <main style={{ flexGrow: 1, backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', overflow: 'hidden' }}>
                         {loading ? (
                             <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>Fetching issues...</div>
-                        ) : error ? (
+                        ) : '' }
+
+                        { error ? (
                             <div style={{ padding: '60px', textAlign: 'center', color: '#b91c1c' }}>{error}</div>
-                        ) : (
+                        ) : '' }
+
+                        {!loading && !error ? (
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
                                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
@@ -453,9 +457,9 @@ export default function IssuesPage() {
                                                     <span style={{ color: '#ff8c00', fontWeight: 'bold', marginRight: '6px', cursor: 'pointer' }}>
                                                         #{issue.id}
                                                     </span>
-                                                    <span style={{ color: '#34495e', fontWeight: '500', fontSize: '15px', cursor: 'pointer' }} onMouseEnter={(e) => e.currentTarget.style.color = '#5dc5b5'} onMouseLeave={(e) => e.currentTarget.style.color = '#34495e'}>
+                                                    <button style={{ color: '#34495e', fontWeight: '500', fontSize: '15px', cursor: 'pointer' }} onMouseEnter={(e) => e.currentTarget.style.color = '#5dc5b5'} onMouseLeave={(e) => e.currentTarget.style.color = '#34495e'}>
                                                         {issue.subject}
-                                                    </span>
+                                                    </button>
                                                 </Link>
                                             </td>
 
@@ -511,7 +515,7 @@ export default function IssuesPage() {
                                 ))}
                                 </tbody>
                             </table>
-                        )}
+                        ) : ''}
                     </main>
                 </div>
             </div>
