@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
 import { getApiBaseUrl } from '../../lib/apiBaseUrl';
@@ -76,7 +76,7 @@ export default function CreateIssuePage() {
         }
     };
 
-    const handleSubmit = async (e: React.SubmitEvent) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setLoading(true);
         setStatusMessage(null);
