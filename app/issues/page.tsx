@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getFilteredIssues, updateIssueStatus, IssueFilterState, IssueListResult } from './issueService';
+import { getFilteredIssues, IssueFilterState, IssueListResult } from './issueService';
 import { getStoredApiKey, getStoredUsername } from '../lib/auth';
+import { fetchEntities } from '../settings/settingsService';
 
 interface IssueField {
     name: string;
@@ -39,9 +40,8 @@ export default function IssuesPage() {
     const [severityCounts, setSeverityCounts] = useState<BackendCounts>({});
     const [priorityCounts, setPriorityCounts] = useState<BackendCounts>({});
     const [statusCounts, setStatusCounts] = useState<BackendCounts>({});
+    const [statuses, setStatuses] = useState<Array<{ name: string; color?: string }>>([]);
     const [assignedToCounts, setAssignedToCounts] = useState<BackendCounts>({});
-
-    const [localStatusChanges, setLocalStatusChanges] = useState<Record<number, string>>({});
 
     const [filters, setFilters] = useState<IssueFilterState>({
         search: '',
@@ -139,6 +139,29 @@ export default function IssuesPage() {
         return () => { isMounted = false; };
     }, [filtersString, refreshTrigger, apiKey]);
 
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadStatuses = async () => {
+            const storedApiKey = getStoredApiKey();
+            if (!storedApiKey) return;
+
+            try {
+                const data = await fetchEntities('statuses', storedApiKey);
+                if (!isMounted) return;
+                setStatuses((data || []).map((status) => ({
+                    name: status.name,
+                    color: status.color,
+                })));
+            } catch (err) {
+                console.error('Error loading statuses from settings:', err);
+            }
+        };
+
+        loadStatuses();
+        return () => { isMounted = false; };
+    }, []);
+
     const handleCheckboxChange = (category: keyof Omit<IssueFilterState, 'search' | 'order_by'>, value: string) => {
         setFilters(prev => {
             const currentList = prev[category] as string[];
@@ -149,36 +172,17 @@ export default function IssuesPage() {
         });
     };
 
-    const handleInlineStatusChange = (issueId: number, value: string) => {
-        setLocalStatusChanges(prev => ({ ...prev, [issueId]: value }));
-    };
-
-    const handleSaveStatus = async (issueId: number, currentStatus: IssueField | null) => {
-        if (!apiKey) {
-            setError('Session expired. Please sign in again.');
-            return;
-        }
-
-        const targetStatus = localStatusChanges[issueId] || currentStatus?.name || 'In Progress';
-
-        const success = await updateIssueStatus(issueId, targetStatus, apiKey);
-        if (success) {
-            setLocalStatusChanges(prev => {
-                const copy = { ...prev };
-                delete copy[issueId];
-                return copy;
-            });
-            setRefreshTrigger(prev => prev + 1);
-        } else {
-            alert("Error: El servidor no procesó el cambio. Revisa la URL del endpoint POST.");
-        }
-    };
-
     const formatDate = (dateStr: string | null) => {
         if (!dateStr) return 'No date';
         const date = new Date(dateStr);
         if (Number.isNaN(date.getTime())) return dateStr;
         return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+
+    const getStatusColor = (statusName: string | undefined): string => {
+        if (!statusName) return '#CCCCCC';
+        const needle = statusName.trim().toLowerCase();
+        return statuses.find(s => s.name.trim().toLowerCase() === needle)?.color || '#CCCCCC';
     };
 
     const getTypeColor = (type: IssueField | null) => type?.color || '#cbd5e1';
@@ -222,7 +226,9 @@ export default function IssuesPage() {
                     <Link href="/issues/new-bulk">
                         <button style={{ padding: '10px 18px', backgroundColor: '#d1d5db', color: '#374151', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #64748b', cursor: 'pointer' }}>BULK ADD</button>
                     </Link>
-                    <button style={{ padding: '10px 18px', backgroundColor: '#d1d5db', color: '#374151', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #64748b' }}>SETTINGS</button>
+                    <Link href="/settings">
+                        <button style={{ padding: '10px 18px', backgroundColor: '#d1d5db', color: '#374151', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #64748b', cursor: 'pointer' }}>SETTINGS</button>
+                    </Link>
                     <Link href={`/profile/${encodeURIComponent(currentUser)}`} style={{ textDecoration: 'none' }}>
                         <button style={{ padding: '10px 18px', backgroundColor: '#64748b', color: '#fff', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #475569', cursor: 'pointer' }}>PROFILE</button>
                     </Link>
@@ -301,14 +307,14 @@ export default function IssuesPage() {
 
                             <div style={{ padding: '10px' }}>
                                 <h4 style={{ padding: '5px 10px', fontSize: '13px', color: '#34495e', margin: '0' }}>Status</h4>
-                                {['New', 'In Progress', 'Ready for test', 'Needs Info', 'Rejected', 'Postponed', 'Closed'].map(st => (
-                                    <div key={st} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', backgroundColor: '#fcfcfc', marginBottom: '2px' }}>
+                                {statuses.map(st => (
+                                    <div key={st.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', backgroundColor: '#fcfcfc', marginBottom: '2px' }}>
                                         <label style={{ display: 'flex', alignItems: 'center', fontSize: '14px', gap: '8px', cursor: 'pointer', color: '#64748b', margin: 0 }}>
-                                            <input type="checkbox" checked={filters.status.includes(st)} onChange={() => handleCheckboxChange('status', st)} />
-                                            {st}
+                                            <input type="checkbox" checked={filters.status.includes(st.name)} onChange={() => handleCheckboxChange('status', st.name)} />
+                                            {st.name}
                                         </label>
                                         <span style={{ backgroundColor: '#ebf0f5', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>
-                                            {getCountSafe(statusCounts, st)}
+                                            {getCountSafe(statusCounts, st.name)}
                                         </span>
                                     </div>
                                 ))}
@@ -396,10 +402,7 @@ export default function IssuesPage() {
                                 </tr>
                                 </thead>
                                 <tbody>
-                                {issues.map((issue) => {
-                                    const currentDisplayStatus = localStatusChanges[issue.id] || issue.status?.name || 'In Progress';
-
-                                    return (
+                                {issues.map((issue) => (
                                         <tr key={issue.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                             <td style={{ padding: '18px 15px', textAlign: 'center' }}>
                                                 <span style={{ width: '12px', height: '12px', borderRadius: '50%', display: 'inline-block', backgroundColor: getTypeColor(issue.type) }} />
@@ -426,23 +429,10 @@ export default function IssuesPage() {
                                             </td>
 
                                             <td style={{ padding: '18px 15px', textAlign: 'left' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                    <select
-                                                        value={currentDisplayStatus}
-                                                        onChange={(e) => handleInlineStatusChange(issue.id, e.target.value)}
-                                                        style={{ padding: '5px 8px', border: '1px solid #cbd5e0', borderRadius: '4px', backgroundColor: '#fff', fontSize: '12px' }}
-                                                    >
-                                                        {['New', 'In Progress', 'Ready for test', 'Needs Info', 'Rejected', 'Postponed', 'Closed'].map(opt => (
-                                                            <option key={opt} value={opt}>{opt}</option>
-                                                        ))}
-                                                    </select>
-                                                    <button
-                                                        onClick={() => handleSaveStatus(issue.id, issue.status)}
-                                                        style={{ background: '#5dc5b5', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', marginLeft: '6px' }}
-                                                    >
-                                                        OK
-                                                    </button>
-                                                </div>
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#34495e' }}>
+                                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block', flexShrink: 0, backgroundColor: getStatusColor(issue.status?.name) }} />
+                                                    {issue.status?.name || 'In Progress'}
+                                                </span>
                                             </td>
 
                                             <td style={{ padding: '18px 15px', textAlign: 'left' }}>
@@ -462,8 +452,7 @@ export default function IssuesPage() {
                                                 {formatDate(issue.modified_at)}
                                             </td>
                                         </tr>
-                                    );
-                                })}
+                                ))}
                                 </tbody>
                             </table>
                         )}
