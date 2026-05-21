@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getFilteredIssues, updateIssueStatus, IssueFilterState, updateIssueFields, IssueListResult } from './issueService';
+import { getFilteredIssues, IssueFilterState, updateIssueFields, IssueListResult } from './issueService';
 import { getStoredApiKey, getStoredUsername } from '../lib/auth';
 import { fetchEntities } from '../settings/settingsService';
 
@@ -173,28 +173,8 @@ export default function IssuesPage() {
         });
     };
 
-    const handleInlineStatusChange = (issueId: number, value: string) => {
-        setLocalStatusChanges(prev => ({ ...prev, [issueId]: value }));
-    };
-
-    const handleSaveStatus = async (issueId: number, currentStatus: IssueField | null) => {
-        const targetStatus = localStatusChanges[issueId] || currentStatus?.name || 'In Progress';
-
-        const success = await updateIssueStatus(issueId, targetStatus, apiKey);
-        if (success) {
-            setLocalStatusChanges(prev => {
-                const copy = { ...prev };
-                delete copy[issueId];
-                return copy;
-            });
-            setRefreshTrigger(prev => prev + 1);
-        } else {
-            alert("Error: El servidor no procesó el cambio. Revisa la URL del endpoint POST.");
-        }
-    };
-
     const handleClearDeadline = async (issueId: number) => {
-        const success = await updateIssueFields(issueId, apiKey, { deadline: "" });
+        const success = await updateIssueFields(issueId, { deadline: "" });
 
         if (success) {
             setRefreshTrigger(prev => prev + 1);

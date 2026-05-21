@@ -206,15 +206,12 @@ export async function createIssueBulk(list: string[]) {
     });
 }
 
-export async function updateIssueFields(id: number, apiKey: string, fields: Record<string, unknown>): Promise<boolean> {
+export async function updateIssueFields(id: number, fields: Record<string, unknown>): Promise<boolean> {
     try {
         const baseUrl = getApiBaseUrl();
         const res = await fetchWithTimeout(`${baseUrl}/issues/${id}/`, {
             method: 'PUT',
-            headers: {
-                'Authorization': apiKey,
-                'Content-Type': 'application/json'
-            },
+            headers: getHeaders(),
             body: JSON.stringify(fields),
         });
         return res.ok;
