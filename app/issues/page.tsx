@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getFilteredIssues, IssueFilterState, IssueListResult } from './issueService';
+import { getFilteredIssues, updateIssueStatus, IssueFilterState, updateIssueFields, IssueListResult } from './issueService';
 import { getStoredApiKey, getStoredUsername } from '../lib/auth';
 import { fetchEntities } from '../settings/settingsService';
 
@@ -40,9 +40,9 @@ export default function IssuesPage() {
     const [severityCounts, setSeverityCounts] = useState<BackendCounts>({});
     const [priorityCounts, setPriorityCounts] = useState<BackendCounts>({});
     const [statusCounts, setStatusCounts] = useState<BackendCounts>({});
+    const [statuses, setStatuses] = useState<Array<{ name: string; color?: string }>>([]);
     const [assignedToCounts, setAssignedToCounts] = useState<BackendCounts>({});
     const [localStatusChanges, setLocalStatusChanges] = useState<Record<number, string>>({});
-    const [statuses, setStatuses] = useState<Array<{ name: string; color?: string }>>([]);
 
     const [filters, setFilters] = useState<IssueFilterState>({
         search: '',
@@ -171,6 +171,36 @@ export default function IssuesPage() {
                 : [...currentList, value];
             return { ...prev, [category]: updatedList };
         });
+    };
+
+    const handleInlineStatusChange = (issueId: number, value: string) => {
+        setLocalStatusChanges(prev => ({ ...prev, [issueId]: value }));
+    };
+
+    const handleSaveStatus = async (issueId: number, currentStatus: IssueField | null) => {
+        const targetStatus = localStatusChanges[issueId] || currentStatus?.name || 'In Progress';
+
+        const success = await updateIssueStatus(issueId, targetStatus, apiKey);
+        if (success) {
+            setLocalStatusChanges(prev => {
+                const copy = { ...prev };
+                delete copy[issueId];
+                return copy;
+            });
+            setRefreshTrigger(prev => prev + 1);
+        } else {
+            alert("Error: El servidor no procesó el cambio. Revisa la URL del endpoint POST.");
+        }
+    };
+
+    const handleClearDeadline = async (issueId: number) => {
+        const success = await updateIssueFields(issueId, apiKey, { deadline: "" });
+
+        if (success) {
+            setRefreshTrigger(prev => prev + 1);
+        } else {
+            alert("No se pudo limpiar la fecha límite en el servidor.");
+        }
     };
 
     const formatDate = (dateStr: string | null) => {
@@ -446,7 +476,32 @@ export default function IssuesPage() {
                                             </td>
 
                                             <td style={{ padding: '18px 15px', color: '#94a3b8', fontSize: '13px', textAlign: 'left' }}>
-                                                {formatDate(issue.deadline)}
+                                                {issue.deadline ? (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <span style={{ color: '#94a3b8', fontSize: '12px' }}>
+                                                            {formatDate(issue.deadline)}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleClearDeadline(issue.id)}
+                                                            className="btn-delete-deadline"
+                                                            title="Clear deadline"
+                                                            style={{
+                                                                background: 'none',
+                                                                border: 'none',
+                                                                color: '#ff5f5f',
+                                                                cursor: 'pointer',
+                                                                padding: '0 2px',
+                                                                fontSize: '12px',
+                                                                lineHeight: 1
+                                                            }}
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <span style={{ color: '#94a3b8', fontSize: '12px' }}>No date</span>
+                                                )}
                                             </td>
 
                                             <td style={{ padding: '18px 15px', color: '#94a3b8', fontSize: '13px', textAlign: 'left' }}>

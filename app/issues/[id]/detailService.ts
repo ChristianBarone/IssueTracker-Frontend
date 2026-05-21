@@ -1,3 +1,4 @@
+import { IssueDetailData, UserProfile } from './types';
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
 import { getStoredApiKey } from '../../lib/auth';
 import { getApiBaseUrl } from '../../lib/apiBaseUrl';
@@ -81,7 +82,9 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
             }
             return { id: 0, name: String(t ?? ''), color: '' };
         }) : [],
-            watchers: Array.isArray(raw.watchers) ? (raw.watchers as unknown[]).map(normalizeWatcher) : [],
+            watchers: Array.isArray(raw.watchers)
+                ? raw.watchers.map(normalizeUser).filter(u => u !== null)
+                : [],
         };
 
         return normalized;
@@ -211,6 +214,35 @@ export async function deleteIssue(id: number): Promise<boolean> {
         return res.ok;
     } catch (error) {
         console.error("Error deleting issue:", error);
+        return false;
+    }
+}
+
+// Añadir watcher <userId> a issue <issueId>
+export async function addWatcher(issueId: number, userId: number): Promise<boolean> {
+    try {
+        const res = await fetchWithTimeout(`${baseUrl}/issues/${issueId}/watchers/`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ user_id: userId }),
+        });
+        return res.ok;
+    } catch (error) {
+        console.error("Error adding watcher:", error);
+        return false;
+    }
+}
+
+// Eliminar watcher <watcherId> de la issue <issueId>
+export async function deleteWatcher(issueId: number, watcherId: number): Promise<boolean> {
+    try {
+        const res = await fetchWithTimeout(`${baseUrl}/issues/${issueId}/watchers/${watcherId}`, { // <- Barra añadida aquí
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+        return res.ok;
+    } catch (error) {
+        console.error("Error deleting watcher:", error);
         return false;
     }
 }

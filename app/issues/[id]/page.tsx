@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
     fetchIssueDetail, updateIssueFields, updateIssueAssignee, deleteIssue,
-    addComment, editComment, deleteComment, deleteAttachment, addAttachment
+    addComment, editComment, deleteComment, deleteAttachment, addAttachment,
+    addWatcher, deleteWatcher
 } from './detailService';
 import { IssueDetailData } from './types';
 import { AUTH_USERS, getStoredUsername, getStoredApiKey, getUserIdByUsername, getUserById } from '../../lib/auth';
@@ -34,6 +35,8 @@ export default function IssueDetailPage() {
     const [isSavingAssignee, setIsSavingAssignee] = useState(false);
     const [assigneeMessage, setAssigneeMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
+    const [selectedUserId, setSelectedUserId] = useState<string>('');
+    const [availableUsers, setAvailableUsers] = useState(AUTH_USERS);
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [descriptionInput, setDescriptionInput] = useState('');
 
@@ -92,6 +95,13 @@ export default function IssueDetailPage() {
         globalThis.addEventListener('storage', onStorage);
         return () => globalThis.removeEventListener('storage', onStorage);
     }, []);
+
+    // Actualizar availableUsers cuando issue carga
+    useEffect(() => {
+        if (issue) {
+            setAvailableUsers(AUTH_USERS.filter((user) => !issue.watchers.includes(user.username)));
+        }
+    }, [issue]);
 
     const isCreator = !!(issue && currentUser &&
         currentUser.replace('@', '').trim().toLowerCase() ===
@@ -208,6 +218,40 @@ export default function IssueDetailPage() {
         }
     };
 
+    const handleAddWatcherSubmit = async (e: React.SubmitEvent) => {
+        e.preventDefault();
+        if (!selectedUserId || !issue) return;
+        const idToNumber = Number(selectedUserId);
+        const userToAdd = availableUsers.find(u => u.id === idToNumber)?.username;
+        if (!userToAdd) return;
+        const success = await addWatcher(issueId, idToNumber);
+        if (success) {
+            setIssue({
+                ...issue,
+                watchers: [...issue.watchers, userToAdd]
+            });
+            setSelectedUserId('');
+            setAvailableUsers(availableUsers.filter((user) => user.username !== userToAdd))
+        } else {
+            alert("No se ha podido añadir al watcher.");
+        }
+    };
+
+    const handleDeleteWatcher = async (userId: number) => {
+        if (!issue) return;
+        const success = await deleteWatcher(issueId, userId);
+        if (success) {
+            const newUsers = Array.from(availableUsers)
+            const user = AUTH_USERS.find(user => user.id === userId)
+            if (user) newUsers.push(user)
+
+            setAvailableUsers(newUsers)
+            await loadData();
+        } else {
+            alert("No se ha podido eliminar al watcher.");
+        }
+    };
+
     const handleAssigneeSelectChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const nextValue = e.target.value;
         setIsSavingAssignee(true);
@@ -318,6 +362,22 @@ export default function IssueDetailPage() {
         if (field === 'priority') return 'changed the priority';
         if (field === 'deadline') return 'changed the deadline';
         return `updated ${fieldName}`;
+    };
+
+    const getActivityUser = (activity: { actor?: string; user?: string }) => {
+        return activity.actor || activity.user || 'System';
+    };
+
+    const getActivityField = (activity: { field_name?: string; field?: string }) => {
+        return activity.field_name || activity.field || '';
+    };
+
+    const getActivityOldValue = (activity: { old_value?: string | null; old?: string | null }) => {
+        return activity.old_value ?? activity.old ?? null;
+    };
+
+    const getActivityNewValue = (activity: { new_value?: string | null; new?: string | null }) => {
+        return activity.new_value ?? activity.new ?? null;
     };
 
     if (loading) return <div className="p-10 text-center text-zinc-400 font-medium">Loading issue data...</div>;
@@ -826,16 +886,53 @@ export default function IssueDetailPage() {
                             )}
                         </div>
                     </div>
+                    <div className="mt-4 border-b border-zinc-100 pb-4">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3">
+                            WATCHERS ({issue.watchers?.length || 0})
+                        </h4>
 
-                    {/* WATCHERS */}
-                    <div className="mt-6 pt-4 border-t border-zinc-100">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3">WATCHERS ({currentWatchers.length})</h4>
-                        <div className="flex gap-1">
-                            <select className="flex-1 text-xs px-2 py-1.5 border border-zinc-200 rounded outline-none bg-zinc-50/50 text-zinc-600">
-                                <option>Add user...</option>
+                        {/* Lista de watchers actuales */}
+                        <ul className="mb-4 flex flex-col gap-2">
+                            {issue.watchers?.map((watcher: string) => {
+                                // Como ya vienen normalizados del servicio, 'watcher' siempre tendrá id y username válidos
+                                return (
+                                    <li key={`${watcher}`} className="flex justify-between items-center text-sm bg-zinc-50 p-2 rounded border border-zinc-100">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-zinc-700 font-medium text-xs">@{watcher || 'unknown'}</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteWatcher(getUserIdByUsername(watcher) ?? 0)}
+                                            className="text-zinc-400 hover:text-red-500 font-bold transition-colors text-xs px-1 cursor-pointer"
+                                        >
+                                            ✕
+                                        </button>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                        {/* Formulario selector */}
+                        <form onSubmit={handleAddWatcherSubmit} className="flex gap-1">
+                            <select
+                                name="user_id"
+                                value={selectedUserId}
+                                onChange={(e) => setSelectedUserId(e.target.value)}
+                                className="flex-1 bg-white border border-zinc-200 rounded text-xs p-2 outline-none focus:border-zinc-400 text-zinc-600"
+                            >
+                                <option value="">Add user...</option>
+                                {availableUsers.map((user) => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.username}
+                                    </option>
+                                ))}
                             </select>
-                            <button className="bg-zinc-100 text-zinc-600 border border-zinc-300 hover:bg-zinc-200 text-xs font-bold px-2.5 rounded">+</button>
-                        </div>
+                            <button
+                                type="submit"
+                                className="bg-zinc-100 text-zinc-700 border border-zinc-200 px-3 py-1.5 rounded text-sm font-bold hover:bg-zinc-200 active:bg-zinc-300 transition-colors"
+                            >
+                                +
+                            </button>
+                        </form>
                     </div>
 
                     {isMyIssue && (
