@@ -11,6 +11,7 @@ import {
 import { IssueDetailData } from './types';
 import { AUTH_USERS, getStoredUsername, getStoredApiKey, getUserIdByUsername, getUserById } from '../../lib/auth';
 import { fetchEntities, AnyEntity } from '../../settings/settingsService';
+import {AssigneeDropdown} from "@/app/components/Assignee-Dropdown";
 
 export default function IssueDetailPage() {
     const { id } = useParams();
@@ -797,21 +798,16 @@ export default function IssueDetailPage() {
                     <div className="flex justify-between items-center py-3 border-b border-zinc-100 text-sm">
                         <span className="text-zinc-400">Assigned</span>
                         <div className="flex flex-col items-end gap-2">
-                            <select
+                            <AssigneeDropdown
                                 value={currentAssigneeValue}
                                 onChange={handleAssigneeSelectChange}
                                 disabled={isSavingAssignee}
-                                className="text-xs px-2 py-1.5 border border-zinc-200 rounded outline-none bg-zinc-50/50 text-zinc-700"
-                            >
-                                <option value="">Unassigned</option>
-                                {AUTH_USERS.map((user) => (
-                                    <option key={user.id} value={String(user.id)}>{user.username}</option>
-                                ))}
-                            </select>
+                                users={AUTH_USERS}
+                            />
                             <button
                                 onClick={handleAssignToMe}
                                 disabled={!canAssignToMe || isSavingAssignee}
-                                className="bg-zinc-100 text-zinc-700 border border-zinc-300 hover:bg-zinc-200 text-xs font-bold px-2.5 py-1.5 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="cursor-pointer bg-zinc-100 text-zinc-700 border border-zinc-300 hover:bg-zinc-200 text-xs font-bold px-2.5 py-1.5 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Assign to me
                             </button>
