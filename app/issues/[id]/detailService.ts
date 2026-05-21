@@ -19,7 +19,7 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
             cache: 'no-store' // Para que siempre traiga comentarios frescos
         });
         if (!res.ok) return null;
-        const raw = (await res.json()) as Record<string, unknown>;
+        const raw = (await res.json()) as Record<string, any>;
         // Debug: log raw backend response for assignee to help diagnose UI mismatch
         try { console.debug('[fetchIssueDetail] raw assignee:', raw.assignee || raw.assigned_to); } catch {};
 
@@ -67,10 +67,10 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
             id: Number(raw.id),
             subject: raw.subject || '',
             description: raw.description ?? null,
-            issue_type: normalizeField(raw.issue_type || raw.type),
-            severity: normalizeField(raw.severity),
-            priority: normalizeField(raw.priority || raw.issue_priority) || (raw.priority ? { id: 0, name: String(raw.priority) } : null),
-            status: normalizeField(raw.status),
+            issue_type: normalizeField(raw.issue_type || raw.type) ?? <IssueField>{id: 1, name: "Default" },
+            severity: normalizeField(raw.severity) ?? <IssueField>{id: 1, name: "Default" },
+            priority: (normalizeField(raw.priority || raw.issue_priority) || (raw.priority ? { id: 0, name: String(raw.priority) } : null)) ?? <IssueField>{id: 1, name: "Default" },
+            status: normalizeField(raw.status) ?? <IssueField>{id: 1, name: "Default" },
             creator: normalizeUser(raw.creator) || { id: 0, username: (raw.creator_name || raw.author || 'unknown') },
             assignee: normalizeUser(raw.assignee || raw.assigned_to) || null,
             deadline: raw.deadline ?? null,
