@@ -1,15 +1,10 @@
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
 import { getStoredApiKey } from '../../lib/auth';
-import { getApiBaseUrl } from '../../lib/apiBaseUrl';
+import {getApiBaseUrl, getHeaders} from '../../lib/apiBaseUrl';
 import { IssueDetailData } from './types';
 import { getUserById, getUserByUsername } from '../../lib/auth';
 
 const baseUrl = getApiBaseUrl();
-
-const getHeaders = () => ({
-    'Authorization': getStoredApiKey() ?? '',
-    'Content-Type': 'application/json',
-});
 
 // Obtener los detalles de una issue por ID
 export async function fetchIssueDetail(id: number): Promise<IssueDetailData | null> {

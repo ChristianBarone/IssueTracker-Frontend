@@ -2,10 +2,9 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
-import { getApiBaseUrl } from '../../lib/apiBaseUrl';
 import { AUTH_USERS, getStoredApiKey, getStoredUsername, getUserIdByUsername } from '../../lib/auth';
 import { fetchEntities } from '../../settings/settingsService';
+import {createIssue} from "@/app/issues/issueService";
 
 export default function CreateIssuePage() {
     const router = useRouter();
@@ -76,7 +75,7 @@ export default function CreateIssuePage() {
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
         e.preventDefault();
         setLoading(true);
         setStatusMessage(null);
@@ -88,13 +87,6 @@ export default function CreateIssuePage() {
         }
 
         try {
-            const apiKey = getApiKey();
-            if (!apiKey) {
-                setStatusMessage({ text: 'Session expired. Please sign in again.', isError: true });
-                setLoading(false);
-                return;
-            }
-
             const dataEnvelope = new FormData();
 
             dataEnvelope.append('subject', formData.subject);
@@ -116,16 +108,8 @@ export default function CreateIssuePage() {
                 dataEnvelope.append('files', file);
             });
 
-            const baseUrl = getApiBaseUrl();
-            const response = await fetchWithTimeout(`${baseUrl}/issues/`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': apiKey
-                },
-                body: dataEnvelope
-            });
-
-            const data = await response.json().catch(() => ({}));
+            const response = await createIssue(dataEnvelope)
+            const data = await response.json()
 
             if (response.ok) {
                 setStatusMessage({ text: `Successfully created issue #${data.id}!`, isError: false });

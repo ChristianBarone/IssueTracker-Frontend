@@ -470,11 +470,11 @@ export default function IssueDetailPage() {
                         <div className="flex items-center justify-between border-b border-zinc-100 pb-2 mb-3">
                             <h3 className="text-base font-bold text-[#2c3e50]">Description</h3>
                             {isCreator && !isEditingDescription && (
-                                <span
+                                <button
                                     onClick={() => { setDescriptionInput(issue.description || ''); setIsEditingDescription(true); }}
                                     className="cursor-pointer text-zinc-400 hover:text-zinc-600 text-sm"
                                     title="Edit description"
-                                >✎</span>
+                                >✎</button>
                             )}
                         </div>
 
@@ -493,7 +493,7 @@ export default function IssueDetailPage() {
                                 </div>
                             </div>
                         ) : (
-                            <p className="text-sm text-zinc-600 leading-relaxed whitespace-pre-wrap min-h-[2rem]">
+                            <p className="text-sm text-zinc-600 leading-relaxed whitespace-pre-wrap min-h-8">
                                 {issue.description || <span className="italic text-zinc-400">No description provided</span>}
                             </p>
                         )}
@@ -548,7 +548,7 @@ export default function IssueDetailPage() {
                             <div className="flex flex-col gap-4">
                                 {issue.activities?.map(act => (
                                     <div key={act.id} className="flex gap-3 text-sm">
-                                        <div className="w-7 h-7 rounded-full bg-zinc-500 text-white flex items-center justify-center font-bold text-xs uppercase flex-shrink-0">
+                                        <div className="w-7 h-7 rounded-full bg-zinc-500 text-white flex items-center justify-center font-bold text-xs uppercase shrink-0">
                                             {act.user ? act.user.slice(0, 1) : 'U'}
                                         </div>
                                         <div>
@@ -643,19 +643,19 @@ export default function IssueDetailPage() {
                             <div key={attr.label} className="border-b border-zinc-100">
                                 <div className="flex justify-between items-center py-3 text-sm">
                                     <span className="text-zinc-400">{attr.label}</span>
-                                    <span
+                                    <button
                                         onClick={() => isCreator && setOpenPicker(isOpen ? null : attr.key)}
                                         className={`font-semibold text-zinc-700 flex items-center gap-2 ${isCreator ? 'cursor-pointer hover:text-[#4db6ac] group' : ''}`}
                                     >
                                         <span
-                                            className="w-2 h-2 rounded-full inline-block flex-shrink-0"
+                                            className="w-2 h-2 rounded-full inline-block shrink-0"
                                             style={{ backgroundColor: currentColor }}
                                         />
                                         {attr.currentName || 'None'}
                                         {isCreator && (
                                             <span className="text-zinc-300 group-hover:text-zinc-500 text-xs transition-colors">✎</span>
                                         )}
-                                    </span>
+                                    </button>
                                 </div>
 
                                 {isOpen && (
@@ -693,7 +693,7 @@ export default function IssueDetailPage() {
                         ) : (
                             <div className="flex justify-between items-center">
                                 <span className="text-zinc-400">Deadline</span>
-                                <span
+                                <button
                                     onClick={() => {
                                         if (!isCreator) return;
                                         setDeadlineInput(issue.deadline ? new Date(issue.deadline).toISOString().split('T')[0] : '');
@@ -703,7 +703,7 @@ export default function IssueDetailPage() {
                                 >
                                     {issue.deadline ? new Date(issue.deadline).toLocaleDateString('en-GB') : 'No date'}
                                     {isCreator && <span className="text-zinc-300 group-hover:text-zinc-500 text-xs transition-colors">✎</span>}
-                                </span>
+                                </button>
                             </div>
                         )}
                     </div>
@@ -771,7 +771,7 @@ export default function IssueDetailPage() {
                                             onClick={() => handleAddTag(tag.id)}
                                             className="flex items-center gap-2.5 px-3 py-2 cursor-pointer text-sm hover:bg-zinc-50 text-zinc-700"
                                         >
-                                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#cbd5e1' }} />
+                                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tag.color || '#cbd5e1' }} />
                                             <span>{tag.name}</span>
                                         </div>
                                     ))

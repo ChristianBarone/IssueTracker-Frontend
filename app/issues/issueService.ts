@@ -1,5 +1,5 @@
 import { fetchWithTimeout } from "../lib/fetchWithTimeout";
-import { getApiBaseUrl } from "../lib/apiBaseUrl";
+import {getApiBaseUrl, getFormDataHeaders, getHeaders} from "../lib/apiBaseUrl";
 
 export interface IssueFilterState {
     search: string;
@@ -190,20 +190,18 @@ export async function getFilteredIssues(filters: IssueFilterState, apiKey: strin
     }
 }
 
-export async function updateIssueStatus(issueId: number, statusName: string, apiKey: string): Promise<boolean> {
-    try {
-        const baseUrl = getApiBaseUrl();
-        const response = await fetchWithTimeout(`${baseUrl}/issue/${issueId}/update-status/`, {
-            method: 'POST',
-            headers: {
-                'Authorization': apiKey,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ status: statusName })
-        });
-        return response.ok || response.status === 302;
-    } catch (error) {
-        console.error("Error al actualizar estado en la API:", error);
-        return false;
-    }
+export async function createIssue(body: FormData) {
+    return await fetchWithTimeout(`${getApiBaseUrl()}/issues/`, {
+        method: 'POST',
+        headers: getFormDataHeaders(),
+        body: body
+    });
+}
+
+export async function createIssueBulk(list: string[]) {
+    return await fetch('https://issuetracker-ff8u.onrender.com/issues/bulk/', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({list})
+    });
 }
