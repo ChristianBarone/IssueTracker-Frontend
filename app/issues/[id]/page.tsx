@@ -13,7 +13,6 @@ import { IssueDetailData } from './types';
 import { AUTH_USERS, getStoredUsername, getStoredApiKey, getUserIdByUsername, getUserById } from '../../lib/auth';
 import { fetchEntities, AnyEntity } from '../../settings/settingsService';
 import { fetchProfile } from '../../profile/profileService';
-import {AssigneeDropdown} from "@/app/components/Dropdown";
 
 export default function IssueDetailPage() {
     const { id } = useParams();
@@ -900,7 +899,7 @@ export default function IssueDetailPage() {
                     <div className="flex justify-between items-center py-3 border-b border-zinc-100 text-sm">
                         <span className="text-zinc-400">Assigned</span>
                         <div className="flex flex-col items-end gap-2">
-                            <AssigneeDropdown
+                            <select
                                 value={currentAssigneeValue}
                                 onChange={handleAssigneeSelectChange}
                                 disabled={isSavingAssignee}
