@@ -4,6 +4,8 @@ import { getApiBaseUrl } from '../../lib/apiBaseUrl';
 import { IssueDetailData, IssueField } from './types';
 import { getUserById, getUserByUsername } from '../../lib/auth';
 
+const baseUrl = getApiBaseUrl();
+
 const getHeaders = () => ({
     'Authorization': getStoredApiKey() ?? '',
     'Content-Type': 'application/json',
@@ -95,7 +97,6 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
 // Cambiamos Record<string, any> por Record<string, unknown>
 export async function updateIssueFields(id: number, fields: Record<string, unknown>): Promise<boolean> {
     try {
-        const baseUrl = getApiBaseUrl();
         const res = await fetchWithTimeout(`${baseUrl}/issues/${id}/`, {
             method: 'PUT',
             headers: getHeaders(),
@@ -205,7 +206,6 @@ export async function updateIssueAssignee(
 // Eliminar por completo la Issue via DELETE
 export async function deleteIssue(id: number): Promise<boolean> {
     try {
-        const baseUrl = getApiBaseUrl();
         const res = await fetchWithTimeout(`${baseUrl}/issues/${id}/`, {
             method: 'DELETE',
             headers: getHeaders(),
@@ -222,7 +222,6 @@ export async function deleteIssue(id: number): Promise<boolean> {
 // Añadir comentario
 export async function addComment(issueId: number, body: string): Promise<boolean> {
     try {
-        const baseUrl = getApiBaseUrl();
         const res = await fetchWithTimeout(`${baseUrl}/issues/${issueId}/comments/`, {
             method: 'POST',
             headers: getHeaders(),
@@ -238,7 +237,6 @@ export async function addComment(issueId: number, body: string): Promise<boolean
 // Editar comentario existente
 export async function editComment(commentId: number, body: string): Promise<boolean> {
     try {
-        const baseUrl = getApiBaseUrl();
         const res = await fetchWithTimeout(`${baseUrl}/comments/${commentId}/`, {
             method: 'PUT',
             headers: getHeaders(),
@@ -254,7 +252,6 @@ export async function editComment(commentId: number, body: string): Promise<bool
 // Eliminar comentario
 export async function deleteComment(commentId: number): Promise<boolean> {
     try {
-        const baseUrl = getApiBaseUrl();
         const res = await fetchWithTimeout(`${baseUrl}/comments/${commentId}/`, {
             method: 'DELETE',
             headers: getHeaders(),
@@ -262,6 +259,35 @@ export async function deleteComment(commentId: number): Promise<boolean> {
         return res.ok;
     } catch (error) {
         console.error("Error deleting comment:", error);
+        return false;
+    }
+}
+
+export async function addAttachment(issueId: number, body: FormData): Promise<boolean> {
+    try {
+        const res = await fetchWithTimeout(`${baseUrl}/issues/${issueId}/attachments`, {
+            method: 'POST',
+            headers: {
+                'Authorization': getStoredApiKey() ?? '',
+            },
+            body: body
+        });
+        return res.ok;
+    } catch (error) {
+        console.error("Error adding attachment:", error);
+        return false;
+    }
+}
+
+export async function deleteAttachment(attachmentId: number): Promise<boolean> {
+    try {
+        const res = await fetchWithTimeout(`${baseUrl}/attachments/${attachmentId}`, {
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+        return res.ok;
+    } catch (error) {
+        console.error("Error deleting attachment:", error);
         return false;
     }
 }
