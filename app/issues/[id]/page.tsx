@@ -1,22 +1,25 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
     fetchIssueDetail, updateIssueFields, deleteIssue,
-    addComment, editComment, deleteComment, deleteAttachment
+    addComment, editComment, deleteComment, deleteAttachment, addAttachment
 } from './detailService';
 import { IssueDetailData } from './types';
-import { getStoredUsername } from '../../lib/auth';
+import { getStoredUsername, getUserId} from '../../lib/auth';
 
 export default function IssueDetailPage() {
     const { id } = useParams();
     const router = useRouter();
     const issueId = Number(id);
 
+    const fileRef = useRef<HTMLInputElement>(null);
+
     const [issue, setIssue] = useState<IssueDetailData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
+    const [uploading, setUploading] = useState<boolean>(false);
     const [activeTab, setActiveTab] = useState<'comments' | 'activities'>('comments');
     const [currentUser, setCurrentUser] = useState<string | null>(null);
 
@@ -26,8 +29,6 @@ export default function IssueDetailPage() {
 
     const [isEditingSubject, setIsEditingSubject] = useState(false);
     const [subjectInput, setSubjectInput] = useState('');
-
-    const [attachment, setAttachment] = useState(null as unknown as File)
 
     const loadData = async () => {
         if (!issueId) return;
@@ -103,40 +104,29 @@ export default function IssueDetailPage() {
 
     const handleAddAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
         try {
+            setUploading(true);
             const body = new FormData();
+            let success = false;
 
-            .forEach(file => {
-                body.append('files', file);
-            });
+            if (e.target.type === 'file' && e.target.files) {
+                const files = Array.from(e.target.files)
 
-            body.append('files', Array.from(e.target?.files));
-
-            const response = await fetch('https://issuetracker-ff8u.onrender.com/issues/', {
-                method: 'POST',
-                headers: {
-                    'Authorization': getApiKey()
-                },
-                body: dataEnvelope
-            });
-
-            const data = await response.json().catch(() => ({}));
-
-            if (response.ok) {
-                setStatusMessage({ text: `Successfully created issue #${data.id}!`, isError: false });
-                router.push('/issues');
-            } else {
-                console.error("Detalle del error de Django:", data);
-                setStatusMessage({
-                    text: data.error || data.message || 'Error del servidor al validar los campos.',
-                    isError: true
-                });
+                files.forEach(file => {
+                    body.append('files', file)
+                })
             }
+            else return
+
+            if (issue !== null) {
+                success = await addAttachment(issue.id, body)
+            }
+
+            if (success) await loadData();
         } catch {
-            setStatusMessage({ text: 'Error de connexió amb el Back-End.', isError: true });
+            console.log('Error de connexió amb el Back-End.');
         } finally {
-            setLoading(false);
+            setUploading(false);
         }
-        if (success) await loadData();
     }
 
     const handleDeleteAttachmentClick= async (attachmentId: number) => {
@@ -282,11 +272,14 @@ export default function IssueDetailPage() {
 
                         {/* ATTACHMENT*/}
                         <div className="mt-6">
-                            <h3 className="text-sm font-bold text-[#2c3e50] mb-3">
-                                {issue.attachments?.length || 0} {(issue.attachments?.length === 1) ? 'Attachment' : 'Attachments'}
-                                <input type="file" id="files" onChange={() => handleAddAttachment()} hidden></input>
-                                <label className="btn-add-file" htmlFor="files">+</label>
-                            </h3>
+                            <div className="mb-4 flex justify-left items-center gap-3">
+                                <h3 className="text-lg font-bold text-[#2c3e50]">
+                                    {issue.attachments?.length || 0} {(issue.attachments?.length === 1) ? 'Attachment' : 'Attachments'}
+                                </h3>
+                                <button onClick={() => fileRef.current?.click()} className="flex align-center justify-center w-7 h-7 font-bold bg-[#5dc5b5] text-white cursor-pointer rounded-sm">+</button>
+                                <input ref={fileRef} type="file" onChange={handleAddAttachment} hidden></input>
+                                <h2 className="text-sm text-[#2c3e50]">{uploading ? "Uploading..." : ""}</h2>
+                            </div>
                             {issue.attachments?.length === 0 ?
                                 ''
                                 : <div
@@ -295,7 +288,7 @@ export default function IssueDetailPage() {
                                         <div key={att.id} className="flex flex-row justify-between items-center">
                                             <a href={att.url} target="_blank" rel="noreferrer"
                                                className="text-[#4db6ac] hover:underline font-medium cursor-pointer">{att.name}</a>
-                                            {att.creator_id === CURRENT_USER_ID ?
+                                            {att.creator_id as unknown as string == getUserId(currentUser) ?
                                                 <button onClick={() => handleDeleteAttachmentClick(att.id)}
                                                         className="cursor-pointer w-7.75 border-2 border-red-500 text-red-500 font-bold p-1 transition duration-200 hover:bg-red-500 hover:text-white">X
                                                 </button>

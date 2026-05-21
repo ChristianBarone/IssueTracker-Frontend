@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
 import { getApiBaseUrl } from '../../lib/apiBaseUrl';
-import { getStoredApiKey, USERNAMES } from '../../lib/auth';
+import {getStoredApiKey, getUserId, USERNAMES} from '../../lib/auth';
 
 export default function CreateIssuePage() {
     const router = useRouter();
@@ -75,23 +75,7 @@ export default function CreateIssuePage() {
             }
 
             if (formData.assigned_to !== 'Unassigned') {
-                let assigneeId = '1'; // Valor de respaldo por defecto
-
-                if (formData.assigned_to === 'Marti-Piris') {
-                    assigneeId = '2';
-                } else if (formData.assigned_to === 'Andreu-Caro') {
-                    assigneeId = '3';
-                } else if (formData.assigned_to === 'Hala-Alkhatib') {
-                    assigneeId = '4';
-                } else if (formData.assigned_to === 'Aleks-Shahverdyan') {
-                    assigneeId = '5';
-                } else if (formData.assigned_to === 'Christian-Alejandro-Barone') {
-                    assigneeId = '6';
-                } else if (formData.assigned_to === 'adminUser') {
-                    assigneeId = '1';
-                }
-
-                dataEnvelope.append('assignee', assigneeId);
+                dataEnvelope.append('assignee', getUserId(formData.assigned_to));
             }
 
             formData.files.forEach(file => {

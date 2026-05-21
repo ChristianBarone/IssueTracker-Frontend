@@ -1,11 +1,11 @@
 const AUTH_STORAGE_KEY = 'issuetracker.currentUser';
 
 export const AUTH_USERS = [
-  { username: 'Andreu-Caro', key: 'Mxk4bUdzGtId8imUNgVKHUiheNKT4AKl' },
-  { username: 'Marti-Piris', key: 'QOSJI1vaqyQM3QoJF1WILQeZU03Rq4YT' },
-  { username: 'Hala-Alkhatib', key: '2dYzNAcecKbK15Zj2OJo4mbQVLTlSzBJ' },
-  { username: 'Aleks-Shahverdyan', key: 'wzkS4JLIQc836R4PAM6RcziMoTElN21G' },
-  { username: 'Christian-Alejandro-Barone', key: 'Yc8yGG2YVBNpeEzcSa5lHZrrkaiXAbRd' }
+  { username: 'Andreu-Caro', key: 'Mxk4bUdzGtId8imUNgVKHUiheNKT4AKl', id: '3' },
+  { username: 'Marti-Piris', key: 'QOSJI1vaqyQM3QoJF1WILQeZU03Rq4YT', id: '2' },
+  { username: 'Hala-Alkhatib', key: '2dYzNAcecKbK15Zj2OJo4mbQVLTlSzBJ', id: '4' },
+  { username: 'Aleks-Shahverdyan', key: 'wzkS4JLIQc836R4PAM6RcziMoTElN21G', id: '5' },
+  { username: 'Christian-Alejandro-Barone', key: 'Yc8yGG2YVBNpeEzcSa5lHZrrkaiXAbRd', id: '6' }
 ];
 
 export const USERNAMES = AUTH_USERS.map((user) => user.username);
@@ -16,6 +16,10 @@ export function isKnownUser(username: string) {
 
 export function getApiKey(username: string) {
   return AUTH_USERS.find((user) => user.username === username)?.key
+}
+
+export function getUserId(username: string | null): string {
+  return AUTH_USERS.find((user) => user.username === username)?.id ?? '1'
 }
 
 export function getStoredUser() {
