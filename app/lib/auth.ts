@@ -1,27 +1,53 @@
 const AUTH_STORAGE_KEY = 'issuetracker.currentUser';
 
+export interface AuthUser {
+  id: number;
+  username: string;
+  key: string;
+}
+
 export const AUTH_USERS = [
-  { username: 'Andreu-Caro', key: 'Mxk4bUdzGtId8imUNgVKHUiheNKT4AKl', id: '3' },
-  { username: 'Marti-Piris', key: 'QOSJI1vaqyQM3QoJF1WILQeZU03Rq4YT', id: '2' },
-  { username: 'Hala-Alkhatib', key: '2dYzNAcecKbK15Zj2OJo4mbQVLTlSzBJ', id: '4' },
-  { username: 'Aleks-Shahverdyan', key: 'wzkS4JLIQc836R4PAM6RcziMoTElN21G', id: '5' },
-  { username: 'Christian-Alejandro-Barone', key: 'Yc8yGG2YVBNpeEzcSa5lHZrrkaiXAbRd', id: '6' }
-];
+  { id: 3, username: 'Andreu-Caro', key: 'Mxk4bUdzGtId8imUNgVKHUiheNKT4AKl' },
+  { id: 2, username: 'Marti-Piris', key: 'QOSJI1vaqyQM3QoJF1WILQeZU03Rq4YT' },
+  { id: 4, username: 'Hala-Alkhatib', key: '2dYzNAcecKbK15Zj2OJo4mbQVLTlSzBJ' },
+  { id: 5, username: 'Aleks-Shahverdyan', key: 'wzkS4JLIQc836R4PAM6RcziMoTElN21G' },
+  { id: 6, username: 'Christian-Alejandro-Barone', key: 'Yc8yGG2YVBNpeEzcSa5lHZrrkaiXAbRd' }
+] as const satisfies ReadonlyArray<AuthUser>;
 
 export const USERNAMES = AUTH_USERS.map((user) => user.username);
 
+function normalizeForMatch(input: string) {
+  return String(input)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/@/g, '')
+    .replace(/[^a-z0-9]/gi, '')
+    .toLowerCase();
+}
+
 export function isKnownUser(username: string) {
-  return USERNAMES.includes(username);
+  const key = username.replace('@', '').trim().toLowerCase();
+  return AUTH_USERS.some((u) => normalizeForMatch(u.username) === normalizeForMatch(key));
 }
 
 export function getApiKey(username: string) {
-  return AUTH_USERS.find((user) => user.username === username)?.key
+  const key = username.replace('@', '').trim().toLowerCase();
+  return AUTH_USERS.find((user) => normalizeForMatch(user.username) === normalizeForMatch(key))?.key
 }
 
-export function getUserId(username: string | null): string {
-  return AUTH_USERS.find((user) => user.username === username)?.id ?? '1'
+export function getUserIdByUsername(username: string): number | null {
+  const key = username.replace('@', '').trim().toLowerCase();
+  return AUTH_USERS.find((user) => normalizeForMatch(user.username) === normalizeForMatch(key))?.id ?? null;
 }
 
+export function getUserByUsername(username: string): AuthUser | null {
+  const key = username.replace('@', '').trim().toLowerCase();
+  return AUTH_USERS.find((user) => normalizeForMatch(user.username) === normalizeForMatch(key)) ?? null;
+}
+
+export function getUserById(id: number): AuthUser | null {
+  return AUTH_USERS.find((user) => user.id === id) ?? null;
+}
 export function getStoredUser() {
   try {
     if (globalThis.window === undefined) return null;

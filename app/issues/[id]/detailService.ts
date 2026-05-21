@@ -1,7 +1,8 @@
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
 import { getStoredApiKey } from '../../lib/auth';
 import { getApiBaseUrl } from '../../lib/apiBaseUrl';
-import { IssueDetailData } from './types';
+import { IssueDetailData, IssueField } from './types';
+import { getUserById, getUserByUsername } from '../../lib/auth';
 
 const baseUrl = getApiBaseUrl();
 
@@ -20,20 +21,47 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
             cache: 'no-store' // Para que siempre traiga comentarios frescos
         });
         if (!res.ok) return null;
-        const raw = await res.json();
+        const raw = (await res.json()) as Record<string, unknown>;
+        // Debug: log raw backend response for assignee to help diagnose UI mismatch
+        try { console.debug('[fetchIssueDetail] raw assignee:', raw.assignee || raw.assigned_to); } catch {};
 
         // Normalize common backend variations so the UI has consistent shapes
-        const normalizeUser = (u: any) => {
+        const normalizeUser = (u: unknown) => {
             if (!u) return null;
-            if (typeof u === 'string') return { id: 0, username: u.replace('@', '') };
-            if (u.username) return u;
+            if (typeof u === 'number') {
+                const knownUser = getUserById(u);
+                return knownUser ? { id: knownUser.id, username: knownUser.username } : null;
+            }
+            if (typeof u === 'string') {
+                const username = u.replace('@', '');
+                const knownUser = getUserByUsername(username);
+                return knownUser ? { id: knownUser.id, username: knownUser.username } : { id: 0, username };
+            }
+            if (typeof u === 'object' && u !== null && 'username' in u) {
+                const username = String((u as { username: unknown }).username).replace('@', '');
+                const rawId = 'id' in u ? Number((u as { id?: unknown }).id) : 0;
+                const knownUser = getUserByUsername(username);
+                return {
+                    id: Number.isFinite(rawId) && rawId > 0 ? rawId : (knownUser?.id ?? 0),
+                    username: knownUser?.username ?? username,
+                };
+            }
             return null;
         };
 
-        const normalizeField = (f: any) => {
+        const normalizeField = (f: unknown): IssueField | null => {
             if (!f) return null;
             if (typeof f === 'string') return { id: 0, name: f };
-            if (f.name) return f;
+            if (typeof f === 'object' && f !== null) {
+                const field = f as Partial<IssueField> & { name?: unknown; color?: unknown };
+                if (typeof field.name === 'string') {
+                    return {
+                        id: typeof field.id === 'number' ? field.id : 0,
+                        name: field.name,
+                        color: typeof field.color === 'string' ? field.color : undefined,
+                    };
+                }
+            }
             return null;
         };
 
@@ -57,6 +85,7 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
             watchers: Array.isArray(raw.watchers) ? raw.watchers : []
         };
 
+        try { console.debug('[fetchIssueDetail] normalized assignee:', normalized.assignee); } catch {};
         return normalized;
     } catch (error) {
         console.error("Error fetching issue details:", error);
@@ -77,6 +106,100 @@ export async function updateIssueFields(id: number, fields: Record<string, unkno
     } catch (error) {
         console.error("Error updating issue:", error);
         return false;
+    }
+}
+
+export async function updateIssueAssignee(
+    id: number,
+    assigneeRef: string | number | null
+): Promise<{ ok: boolean; status?: number; message?: string }> {
+    try {
+        const baseUrl = getApiBaseUrl();
+        let payload: Record<string, unknown>;
+        if (assigneeRef == null || assigneeRef === '') {
+            payload = { user_id: null };
+        } else if (typeof assigneeRef === 'number' || (!isNaN(Number(assigneeRef)) && String(assigneeRef).trim() !== '')) {
+            payload = { user_id: Number(assigneeRef) };
+        } else {
+            payload = { user_id: String(assigneeRef) };
+        }
+
+        const endpoints = [
+            `${baseUrl}/issues/${id}/assignee/`,
+            `${baseUrl}/issue/${id}/update-assignee/`
+        ];
+
+        let lastStatus: number | undefined;
+        let lastMessage = '';
+
+        for (const endpoint of endpoints) {
+            try {
+                console.debug('[updateIssueAssignee] PUT', endpoint, 'payload:', payload);
+            } catch {}
+
+            const res = await fetchWithTimeout(endpoint, {
+                method: 'PUT',
+                headers: getHeaders(),
+                body: JSON.stringify(payload),
+            });
+
+            let textBody = '';
+            try {
+                textBody = await res.text();
+                try { console.debug('[updateIssueAssignee] response', res.status, textBody); } catch {}
+            } catch (e) {
+                try { console.debug('[updateIssueAssignee] response reading failed', e); } catch {}
+            }
+
+            if (res.ok) return { ok: true };
+
+            // If server errored (5xx) when sending a numeric id, try string username fallback once
+            if ((res.status >= 500 && res.status < 600) && typeof payload.user_id === 'number') {
+                try {
+                    const fallbackUser = getUserById(Number(payload.user_id));
+                    if (fallbackUser) {
+                        const fallbackPayload = { user_id: String(fallbackUser.username) };
+                        try { console.debug('[updateIssueAssignee] retrying with username fallback', endpoint, fallbackPayload); } catch {}
+                        const retryRes = await fetchWithTimeout(endpoint, {
+                            method: 'PUT',
+                            headers: getHeaders(),
+                            body: JSON.stringify(fallbackPayload),
+                        });
+                        let retryText = '';
+                        try { retryText = await retryRes.text(); } catch {}
+                        try { console.debug('[updateIssueAssignee] retry response', retryRes.status, retryText); } catch {}
+                        if (retryRes.ok) return { ok: true };
+                        // otherwise, treat retry failure as the final error for this endpoint
+                    }
+                } catch (e) {
+                    try { console.debug('[updateIssueAssignee] username fallback failed', e); } catch {}
+                }
+            }
+
+            lastStatus = res.status;
+            try {
+                const parsed = JSON.parse(textBody || '{}');
+                if (parsed?.message) lastMessage = String(parsed.message);
+                else if (parsed?.error) lastMessage = String(parsed.error);
+                else if (textBody) lastMessage = String(textBody).slice(0, 200);
+            } catch {
+                if (textBody) lastMessage = String(textBody).slice(0, 200);
+            }
+
+            // If endpoint exists but request failed for another reason, stop here.
+            if (res.status !== 404) {
+                break;
+            }
+        }
+
+        return {
+            ok: false,
+            status: lastStatus,
+            message: lastMessage || 'Could not update assignee'
+        };
+    } catch (error) {
+        console.error("Error updating assignee:", error);
+        return { ok: false, message: error instanceof Error ? error.message : 'Request failed' };
     }
 }
 
