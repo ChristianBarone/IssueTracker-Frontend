@@ -1,9 +1,7 @@
-import { IssueDetailData, UserProfile } from './types';
-import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
-import { getStoredApiKey } from '../../lib/auth';
-import { getApiBaseUrl } from '../../lib/apiBaseUrl';
 import { IssueDetailData } from './types';
-import { getUserById, getUserByUsername } from '../../lib/auth';
+import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
+import { getApiBaseUrl } from '../../lib/apiBaseUrl';
+import { getStoredApiKey, getUserById, getUserByUsername } from '../../lib/auth';
 
 const baseUrl = getApiBaseUrl();
 
