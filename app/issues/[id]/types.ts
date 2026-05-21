@@ -12,9 +12,10 @@ export interface IssueField {
 
 export interface Attachment {
     id: number;
+    issue_id: number;
+    creator_id: number;
+    url: string;
     name: string;
-    file_url: string;
-    creator: string;
 }
 
 export interface Activity {

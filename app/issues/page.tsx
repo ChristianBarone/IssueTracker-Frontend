@@ -177,7 +177,7 @@ export default function IssuesPage() {
     const formatDate = (dateStr: string | null) => {
         if (!dateStr) return 'No date';
         const date = new Date(dateStr);
-        if (isNaN(date.getTime())) return dateStr;
+        if (Number.isNaN(date.getTime())) return dateStr;
         return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     };
 
@@ -193,7 +193,7 @@ export default function IssuesPage() {
 
     const getCountSafe = (countsObj: BackendCounts, key: string) => {
         if (!countsObj) return 0;
-        return countsObj[key] !== undefined ? countsObj[key] : (countsObj[key.toLowerCase()] !== undefined ? countsObj[key.toLowerCase()] : 0);
+        return countsObj[key] ?? (countsObj[key.toLowerCase()] !== undefined ? countsObj[key.toLowerCase()] : 0);
     };
 
     return (
