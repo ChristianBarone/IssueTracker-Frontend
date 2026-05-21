@@ -1,3 +1,6 @@
+import { fetchWithTimeout } from "../lib/fetchWithTimeout";
+import { getApiBaseUrl } from "../lib/apiBaseUrl";
+
 export interface IssueFilterState {
     search: string;
     order_by: string;
@@ -12,6 +15,17 @@ export interface IssueStatusField {
     id?: number;
     name: string;
     color?: string;
+}
+
+export interface IssueListResult {
+    issues: Record<string, unknown>[];
+    total_count: number;
+    type_counts: Record<string, number>;
+    severity_counts: Record<string, number>;
+    priority_counts: Record<string, number>;
+    status_counts: Record<string, number>;
+    assigned_to_counts: Record<string, number>;
+    error?: string;
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -38,10 +52,9 @@ const STATUS_COLORS: Record<string, string> = {
     'Postponed': '#4070E4'
 };
 
-const BASE_URL = 'https://issuetracker-ff8u.onrender.com';
-
-export async function getFilteredIssues(filters: IssueFilterState, apiKey: string) {
+export async function getFilteredIssues(filters: IssueFilterState, apiKey: string): Promise<IssueListResult> {
     try {
+        const baseUrl = getApiBaseUrl();
         const params = new URLSearchParams();
         if (filters.search) params.append('search', filters.search);
         if (filters.order_by) params.append('order_by', filters.order_by);
@@ -50,10 +63,23 @@ export async function getFilteredIssues(filters: IssueFilterState, apiKey: strin
         filters.issue_severity.forEach(s => params.append('issue_severity', s));
         filters.priority.forEach(p => params.append('priority', p));
         filters.status.forEach(st => params.append('status', st));
+        filters.assigned_to.forEach(a => {
+            let idToSend = a;
 
-        const url = `${BASE_URL}/issues/?${params.toString()}`;
+            if (a === 'Andreu-Caro') idToSend = '3';
+            else if (a == 'adminUser') idToSend = '1'
+            else if (a === 'Marti-Piris') idToSend = '2';
+            else if (a === 'Hala-Alkhatib') idToSend = '4';
+            else if (a === 'Aleks-Shahverdyan') idToSend = '5';
+            else if (a === 'Christian-Alejandro-Barone') idToSend = '6';
+            else if (a === 'Unassigned') idToSend = 'unassigned'; // O como maneje Django los vacíos
 
-        const response = await fetch(url, {
+            params.append('assigned_to', idToSend);
+        });
+
+        const url = `${baseUrl}/issues/?${params.toString()}`;
+
+        const response = await fetchWithTimeout(url, {
             method: 'GET',
             headers: {
                 'Authorization': apiKey,
@@ -62,8 +88,26 @@ export async function getFilteredIssues(filters: IssueFilterState, apiKey: strin
         });
 
         if (!response.ok) {
-            console.error("¡ERROR DE LA API DETECTADO!");
-            throw new Error(`Error al conectar con la API REST de Render (Status: ${response.status})`);
+            let errorMessage = `Error al conectar con la API REST (Status: ${response.status})`;
+            try {
+                const payload = await response.json();
+                if (payload?.message) {
+                    errorMessage = String(payload.message);
+                }
+            } catch {
+                // Keep the status-based message when the backend body is not JSON.
+            }
+
+            return {
+                issues: [],
+                total_count: 0,
+                type_counts: {},
+                severity_counts: {},
+                priority_counts: {},
+                status_counts: {},
+                assigned_to_counts: {},
+                error: errorMessage
+            };
         }
 
         const data = await response.json();
@@ -132,14 +176,24 @@ export async function getFilteredIssues(filters: IssueFilterState, apiKey: strin
             assigned_to_counts
         };
     } catch (error) {
-        console.error("Error en getFilteredIssues:", error);
-        return { issues: [], total_count: 0, type_counts: {}, severity_counts: {}, priority_counts: {}, status_counts: {}, assigned_to_counts: {} };
+        const message = error instanceof Error ? error.message : 'Error de sincronización.';
+        return {
+            issues: [],
+            total_count: 0,
+            type_counts: {},
+            severity_counts: {},
+            priority_counts: {},
+            status_counts: {},
+            assigned_to_counts: {},
+            error: message
+        };
     }
 }
 
 export async function updateIssueStatus(issueId: number, statusName: string, apiKey: string): Promise<boolean> {
     try {
-        const response = await fetch(`${BASE_URL}/issue/${issueId}/update-status/`, {
+        const baseUrl = getApiBaseUrl();
+        const response = await fetchWithTimeout(`${baseUrl}/issue/${issueId}/update-status/`, {
             method: 'POST',
             headers: {
                 'Authorization': apiKey,

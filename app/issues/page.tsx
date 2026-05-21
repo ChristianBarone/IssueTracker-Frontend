@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getFilteredIssues, updateIssueStatus, IssueFilterState, updateIssueFields } from './issueService';
+import { getFilteredIssues, updateIssueStatus, IssueFilterState, updateIssueFields, IssueListResult } from './issueService';
+import { getStoredApiKey, getStoredUsername } from '../lib/auth';
+import { fetchEntities } from '../settings/settingsService';
 
 interface IssueField {
     name: string;
@@ -31,15 +33,15 @@ export default function IssuesPage() {
     const [totalCount, setTotalCount] = useState<number>(0);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const [showFilters, setShowFilters] = useState<boolean>(true);
+    const [showFilters, setShowFilters] = useState<boolean>(false);
     const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
     const [typeCounts, setTypeCounts] = useState<BackendCounts>({});
     const [severityCounts, setSeverityCounts] = useState<BackendCounts>({});
     const [priorityCounts, setPriorityCounts] = useState<BackendCounts>({});
     const [statusCounts, setStatusCounts] = useState<BackendCounts>({});
-
-    const [localStatusChanges, setLocalStatusChanges] = useState<Record<number, string>>({});
+    const [statuses, setStatuses] = useState<Array<{ name: string; color?: string }>>([]);
+    const [assignedToCounts, setAssignedToCounts] = useState<BackendCounts>({});
 
     const [filters, setFilters] = useState<IssueFilterState>({
         search: '',
@@ -51,7 +53,8 @@ export default function IssuesPage() {
         assigned_to: []
     });
 
-    const apiKey = "Mxk4bUdzGtId8imUNgVKHUiheNKT4AKl";
+    const apiKey = getStoredApiKey();
+    const currentUser = getStoredUsername() ?? 'Andreu-Caro';
 
     const handleSort = (field: string) => {
         setFilters(prev => {
@@ -87,10 +90,19 @@ export default function IssuesPage() {
         const loadIssues = async () => {
             setLoading(true);
             try {
+                if (!apiKey) {
+                    throw new Error('Session expired. Please sign in again.');
+                }
+
                 const currentFilters = JSON.parse(filtersString) as IssueFilterState;
-                const data = await getFilteredIssues(currentFilters, apiKey);
+                const data: IssueListResult = await getFilteredIssues(currentFilters, apiKey);
                 if (isMounted) {
-                    // CORREGIDO: Tipado seguro sin usar 'any' para evitar que se queje el linter
+                    if (data.error) {
+                        setError(data.error);
+                    } else {
+                        setError(null);
+                    }
+
                     const normalizedIssues = (data.issues || []).map((issue: Record<string, unknown>) => ({
                         ...issue,
                         id: Number(issue.id),
@@ -114,18 +126,41 @@ export default function IssuesPage() {
                     setSeverityCounts(data.severity_counts || {});
                     setStatusCounts(data.status_counts || {});
                     setPriorityCounts(data.priority_counts || {});
+                    setAssignedToCounts(data.assigned_to_counts || {});
 
-                    setError(null);
                 }
             } catch (err) {
-                if (isMounted) setError("Error de sincronización.");
+                if (isMounted) setError(err instanceof Error ? err.message : 'Sincronization error.');
             } finally {
                 if (isMounted) setLoading(false);
             }
         };
         loadIssues();
         return () => { isMounted = false; };
-    }, [filtersString, refreshTrigger]);
+    }, [filtersString, refreshTrigger, apiKey]);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadStatuses = async () => {
+            const storedApiKey = getStoredApiKey();
+            if (!storedApiKey) return;
+
+            try {
+                const data = await fetchEntities('statuses', storedApiKey);
+                if (!isMounted) return;
+                setStatuses((data || []).map((status) => ({
+                    name: status.name,
+                    color: status.color,
+                })));
+            } catch (err) {
+                console.error('Error loading statuses from settings:', err);
+            }
+        };
+
+        loadStatuses();
+        return () => { isMounted = false; };
+    }, []);
 
     const handleCheckboxChange = (category: keyof Omit<IssueFilterState, 'search' | 'order_by'>, value: string) => {
         setFilters(prev => {
@@ -170,8 +205,14 @@ export default function IssuesPage() {
     const formatDate = (dateStr: string | null) => {
         if (!dateStr) return 'No date';
         const date = new Date(dateStr);
-        if (isNaN(date.getTime())) return dateStr;
+        if (Number.isNaN(date.getTime())) return dateStr;
         return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+
+    const getStatusColor = (statusName: string | undefined): string => {
+        if (!statusName) return '#CCCCCC';
+        const needle = statusName.trim().toLowerCase();
+        return statuses.find(s => s.name.trim().toLowerCase() === needle)?.color || '#CCCCCC';
     };
 
     const getTypeColor = (type: IssueField | null) => type?.color || '#cbd5e1';
@@ -186,7 +227,7 @@ export default function IssuesPage() {
 
     const getCountSafe = (countsObj: BackendCounts, key: string) => {
         if (!countsObj) return 0;
-        return countsObj[key] !== undefined ? countsObj[key] : (countsObj[key.toLowerCase()] !== undefined ? countsObj[key.toLowerCase()] : 0);
+        return countsObj[key] ?? (countsObj[key.toLowerCase()] !== undefined ? countsObj[key.toLowerCase()] : 0);
     };
 
     return (
@@ -212,14 +253,25 @@ export default function IssuesPage() {
                     <Link href="/issues/new" style={{ marginLeft: 'auto' }}>
                         <button style={{ padding: '10px 20px', backgroundColor: '#5dc5b5', color: '#fff', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', boxShadow: '0 3px 0 #469b8e' }}>+ NEW ISSUE</button>
                     </Link>
-                    <button style={{ padding: '10px 18px', backgroundColor: '#d1d5db', color: '#374151', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #64748b' }}>BULK ADD</button>
-                    <button style={{ padding: '10px 18px', backgroundColor: '#d1d5db', color: '#374151', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #64748b' }}>SETTINGS</button>
-                    <button style={{ padding: '10px 18px', backgroundColor: '#64748b', color: '#fff', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #475569' }}>PROFILE</button>
+                    <Link href="/issues/new-bulk">
+                        <button style={{ padding: '10px 18px', backgroundColor: '#d1d5db', color: '#374151', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #64748b', cursor: 'pointer' }}>BULK ADD</button>
+                    </Link>
+                    <Link href="/settings">
+                        <button style={{ padding: '10px 18px', backgroundColor: '#d1d5db', color: '#374151', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #64748b', cursor: 'pointer' }}>SETTINGS</button>
+                    </Link>
+                    <Link href={`/profile/${encodeURIComponent(currentUser)}`} style={{ textDecoration: 'none' }}>
+                        <button style={{ padding: '10px 18px', backgroundColor: '#64748b', color: '#fff', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #475569', cursor: 'pointer' }}>PROFILE</button>
+                    </Link>
                 </header>
 
                 <div style={{ display: 'flex', gap: '25px', alignItems: 'flex-start' }}>
                     {showFilters && (
                         <aside style={{ width: '280px', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                            {error && (
+                                <div style={{ margin: '12px', padding: '12px 14px', borderRadius: '10px', border: '1px solid #fecaca', backgroundColor: '#fff1f2', color: '#be123c', fontSize: '13px', fontWeight: 600 }}>
+                                    {error}
+                                </div>
+                            )}
                             <div style={{ padding: '15px', backgroundColor: '#edf2f7', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '13px' }}>
                                 <span>Filters ({totalCount})</span>
                             </div>
@@ -276,7 +328,6 @@ export default function IssuesPage() {
                                             <input type="checkbox" checked={filters.priority.includes(p.name)} onChange={() => handleCheckboxChange('priority', p.name)} />
                                             {p.name}
                                         </label>
-                                        {/* CORREGIDO: Modificado font_weight por fontWeight */}
                                         <span style={{ backgroundColor: '#ebf0f5', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>
                                             {getCountSafe(priorityCounts, p.name)}
                                         </span>
@@ -286,14 +337,42 @@ export default function IssuesPage() {
 
                             <div style={{ padding: '10px' }}>
                                 <h4 style={{ padding: '5px 10px', fontSize: '13px', color: '#34495e', margin: '0' }}>Status</h4>
-                                {['New', 'In Progress', 'Ready for test', 'Needs Info', 'Rejected', 'Postponed', 'Closed'].map(st => (
-                                    <div key={st} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', backgroundColor: '#fcfcfc', marginBottom: '2px' }}>
+                                {statuses.map(st => (
+                                    <div key={st.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', backgroundColor: '#fcfcfc', marginBottom: '2px' }}>
                                         <label style={{ display: 'flex', alignItems: 'center', fontSize: '14px', gap: '8px', cursor: 'pointer', color: '#64748b', margin: 0 }}>
-                                            <input type="checkbox" checked={filters.status.includes(st)} onChange={() => handleCheckboxChange('status', st)} />
-                                            {st}
+                                            <input type="checkbox" checked={filters.status.includes(st.name)} onChange={() => handleCheckboxChange('status', st.name)} />
+                                            {st.name}
                                         </label>
                                         <span style={{ backgroundColor: '#ebf0f5', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>
-                                            {getCountSafe(statusCounts, st)}
+                                            {getCountSafe(statusCounts, st.name)}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* AGREGADO: Sección de filtros visuales para "Assigned To" */}
+                            <div style={{ padding: '10px' }}>
+                                <h4 style={{ padding: '5px 10px', fontSize: '13px', color: '#34495e', margin: '0' }}>Assigned To</h4>
+                                {[
+                                    'Unassigned',
+                                    'Andreu-Caro',
+                                    'Marti-Piris',
+                                    'Hala-Alkhatib',
+                                    'Aleks-Shahverdyan',
+                                    'Christian-Alejandro-Barone',
+                                    'adminUser'
+                                ].map(user => (
+                                    <div key={user} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', backgroundColor: '#fcfcfc', marginBottom: '2px', borderLeft: '4px solid #64748b' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', fontSize: '14px', gap: '8px', cursor: 'pointer', color: '#64748b', margin: 0 }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={filters.assigned_to.includes(user)}
+                                                onChange={() => handleCheckboxChange('assigned_to', user)}
+                                            />
+                                            {user}
+                                        </label>
+                                        <span style={{ backgroundColor: '#ebf0f5', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>
+                                            {getCountSafe(assignedToCounts, user)}
                                         </span>
                                     </div>
                                 ))}
@@ -303,7 +382,9 @@ export default function IssuesPage() {
 
                     <main style={{ flexGrow: 1, backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', overflow: 'hidden' }}>
                         {loading ? (
-                            <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>Sincronizando con el servidor...</div>
+                            <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>Fetching issues...</div>
+                        ) : error ? (
+                            <div style={{ padding: '60px', textAlign: 'center', color: '#b91c1c' }}>{error}</div>
                         ) : (
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
@@ -351,10 +432,7 @@ export default function IssuesPage() {
                                 </tr>
                                 </thead>
                                 <tbody>
-                                {issues.map((issue) => {
-                                    const currentDisplayStatus = localStatusChanges[issue.id] || issue.status?.name || 'In Progress';
-
-                                    return (
+                                {issues.map((issue) => (
                                         <tr key={issue.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                             <td style={{ padding: '18px 15px', textAlign: 'center' }}>
                                                 <span style={{ width: '12px', height: '12px', borderRadius: '50%', display: 'inline-block', backgroundColor: getTypeColor(issue.type) }} />
@@ -381,23 +459,10 @@ export default function IssuesPage() {
                                             </td>
 
                                             <td style={{ padding: '18px 15px', textAlign: 'left' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                    <select
-                                                        value={currentDisplayStatus}
-                                                        onChange={(e) => handleInlineStatusChange(issue.id, e.target.value)}
-                                                        style={{ padding: '5px 8px', border: '1px solid #cbd5e0', borderRadius: '4px', backgroundColor: '#fff', fontSize: '12px' }}
-                                                    >
-                                                        {['New', 'In Progress', 'Ready for test', 'Needs Info', 'Rejected', 'Postponed', 'Closed'].map(opt => (
-                                                            <option key={opt} value={opt}>{opt}</option>
-                                                        ))}
-                                                    </select>
-                                                    <button
-                                                        onClick={() => handleSaveStatus(issue.id, issue.status)}
-                                                        style={{ background: '#5dc5b5', color: 'white', border: 'none', padding: '6px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', marginLeft: '6px' }}
-                                                    >
-                                                        OK
-                                                    </button>
-                                                </div>
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#34495e' }}>
+                                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block', flexShrink: 0, backgroundColor: getStatusColor(issue.status?.name) }} />
+                                                    {issue.status?.name || 'In Progress'}
+                                                </span>
                                             </td>
 
                                             <td style={{ padding: '18px 15px', textAlign: 'left' }}>
@@ -442,8 +507,7 @@ export default function IssuesPage() {
                                                 {formatDate(issue.modified_at)}
                                             </td>
                                         </tr>
-                                    );
-                                })}
+                                ))}
                                 </tbody>
                             </table>
                         )}
