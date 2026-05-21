@@ -69,7 +69,18 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
             attachments: Array.isArray(raw.attachments) ? raw.attachments as IssueDetailData['attachments'] : [],
             comments: Array.isArray(raw.comments) ? raw.comments as IssueDetailData['comments'] : [],
             activities: Array.isArray(raw.activities) ? raw.activities as IssueDetailData['activities'] : [],
-            tags: Array.isArray(raw.tags) ? raw.tags as IssueDetailData['tags'] : [],
+            tags: Array.isArray(raw.tags) ? raw.tags.map((t: unknown): IssueDetailData['tags'][number] => {
+            if (typeof t === 'number') return { id: t, name: '', color: '' };
+            if (typeof t === 'object' && t !== null) {
+                const obj = t as Record<string, unknown>;
+                return {
+                    id: Number(obj.id ?? 0),
+                    name: String(obj.name ?? ''),
+                    color: String(obj.color ?? ''),
+                };
+            }
+            return { id: 0, name: String(t ?? ''), color: '' };
+        }) : [],
             watchers: Array.isArray(raw.watchers) ? (raw.watchers as unknown[]).map(normalizeWatcher) : [],
         };
 
