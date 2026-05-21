@@ -210,7 +210,8 @@ export async function updateIssueStatus(issueId: number, statusName: string, api
 
 export async function updateIssueFields(id: number, apiKey: string, fields: Record<string, unknown>): Promise<boolean> {
     try {
-        const res = await fetch(`${BASE_URL}/issues/${id}/`, {
+        const baseUrl = getApiBaseUrl();
+        const res = await fetchWithTimeout(`${baseUrl}/issues/${id}/`, {
             method: 'PUT',
             headers: {
                 'Authorization': apiKey,

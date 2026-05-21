@@ -83,7 +83,9 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
             comments: Array.isArray(raw.comments) ? raw.comments : [],
             activities: Array.isArray(raw.activities) ? raw.activities : [],
             tags: Array.isArray(raw.tags) ? raw.tags : [],
-            watchers: Array.isArray(raw.watchers) ? raw.watchers : []
+            watchers: Array.isArray(raw.watchers)
+                ? raw.watchers.map(normalizeUser).filter(u => u !== null)
+                : [],
         };
 
         try { console.debug('[fetchIssueDetail] normalized assignee:', normalized.assignee); } catch {};
@@ -221,7 +223,7 @@ export async function deleteIssue(id: number): Promise<boolean> {
 // Añadir watcher <userId> a issue <issueId>
 export async function addWatcher(issueId: number, userId: number): Promise<boolean> {
     try {
-        const res = await fetch(`${BASE_URL}/issues/${issueId}/watchers/`, {
+        const res = await fetchWithTimeout(`${baseUrl}/issues/${issueId}/watchers/`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify({ user_id: userId }),
@@ -236,7 +238,7 @@ export async function addWatcher(issueId: number, userId: number): Promise<boole
 // Eliminar watcher <watcherId> de la issue <issueId>
 export async function deleteWatcher(issueId: number, watcherId: number): Promise<boolean> {
     try {
-        const res = await fetch(`${BASE_URL}/issues/${issueId}/watchers/${watcherId}`, {
+        const res = await fetchWithTimeout(`${baseUrl}/issues/${issueId}/watchers/${watcherId}`, { // <- Barra añadida aquí
             method: 'DELETE',
             headers: getHeaders(),
         });
