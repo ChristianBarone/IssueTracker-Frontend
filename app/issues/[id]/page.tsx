@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import React, {useState, useEffect, useRef, useMemo} from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -11,6 +12,7 @@ import {
 import { IssueDetailData } from './types';
 import { AUTH_USERS, getStoredUsername, getStoredApiKey, getUserIdByUsername, getUserById } from '../../lib/auth';
 import { fetchEntities, AnyEntity } from '../../settings/settingsService';
+import { fetchProfile } from '../../profile/profileService';
 
 export default function IssueDetailPage() {
     const { id } = useParams();
@@ -48,6 +50,7 @@ export default function IssueDetailPage() {
     const [priorities, setPriorities] = useState<AnyEntity[]>([]);
     const [statuses, setStatuses] = useState<AnyEntity[]>([]);
     const [allTags, setAllTags] = useState<AnyEntity[]>([]);
+    const [userAvatars, setUserAvatars] = useState<Record<string, string | null>>({});
 
     const [openPicker, setOpenPicker] = useState<string | null>(null);
 
@@ -328,6 +331,37 @@ export default function IssueDetailPage() {
         return `${weeks} week${weeks > 1 ? 's' : ''}, ${remainingDays} day${remainingDays === 1 ? '' : 's'} ago`;
     };
 
+    const normalizeUsername = (value: string) => value.replace('@', '').trim();
+
+    const getProfileHref = (value: string) => `/profile/${encodeURIComponent(normalizeUsername(value))}`;
+
+    const getUserAvatar = (value: string) => userAvatars[normalizeUsername(value)] ?? null;
+
+    const UserAvatar = ({ username, size = 28 }: { username: string; size?: number }) => {
+        const avatarUrl = getUserAvatar(username);
+        const initials = normalizeUsername(username).slice(0, 2).toUpperCase() || 'U';
+
+        return (
+            <div
+                className="relative flex-shrink-0 overflow-hidden rounded-full bg-zinc-500 text-white flex items-center justify-center font-bold uppercase"
+                style={{ width: size, height: size }}
+            >
+                {avatarUrl ? (
+                    <Image
+                        src={avatarUrl}
+                        alt={`Avatar of ${normalizeUsername(username)}`}
+                        fill
+                        unoptimized
+                        sizes={`${size}px`}
+                        className="object-cover"
+                    />
+                ) : (
+                    <span className="text-[10px] leading-none">{initials}</span>
+                )}
+            </div>
+        );
+    };
+
     const getActivityLabel = (fieldName: string | undefined | null, oldValue: string | null, newValue: string | null) => {
         const field = String(fieldName ?? '').toLowerCase();
         if (!field) return 'updated this issue';
@@ -377,7 +411,58 @@ export default function IssueDetailPage() {
         return activity.new_value ?? activity.new ?? null;
     };
 
-    const getProfileHref = (value: string) => `/profile/${encodeURIComponent(value.replace('@', '').trim())}`;
+    useEffect(() => {
+        if (!issue) return;
+
+        const apiKey = getStoredApiKey();
+        if (!apiKey) return;
+
+        const usernames = new Set<string>();
+
+        issue.comments.forEach((comment) => {
+            const author = normalizeUsername(comment.author);
+            if (author) usernames.add(author);
+        });
+
+        issue.activities.forEach((activity) => {
+            const actor = normalizeUsername(getActivityUser(activity));
+            if (actor && actor.toLowerCase() !== 'system') usernames.add(actor);
+        });
+
+        const missingUsernames = Array.from(usernames).filter((username) => userAvatars[username] === undefined);
+        if (missingUsernames.length === 0) return;
+
+        let cancelled = false;
+
+        const loadAvatars = async () => {
+            const results = await Promise.all(
+                missingUsernames.map(async (username) => {
+                    try {
+                        const profile = await fetchProfile(username, apiKey);
+                        return [username, profile.avatar ?? null] as const;
+                    } catch {
+                        return [username, null] as const;
+                    }
+                })
+            );
+
+            if (cancelled) return;
+
+            setUserAvatars((prev) => {
+                const next = { ...prev };
+                results.forEach(([username, avatarUrl]) => {
+                    next[username] = avatarUrl;
+                });
+                return next;
+            });
+        };
+
+        void loadAvatars();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [issue, userAvatars]);
 
     if (loading) return <div className="p-10 text-center text-zinc-400 font-medium">Loading issue data...</div>;
     if (!issue) return (
@@ -624,9 +709,7 @@ export default function IssueDetailPage() {
                             <div className="flex flex-col gap-4">
                                 {issue.activities?.map(act => (
                                     <div key={act.id} className="flex gap-3 text-sm">
-                                        <div className="w-7 h-7 rounded-full bg-zinc-500 text-white flex items-center justify-center font-bold text-xs uppercase shrink-0">
-                                            {act.user ? act.user.slice(0, 1) : 'U'}
-                                        </div>
+                                        <UserAvatar username={getActivityUser(act)} />
                                         <div>
                                             <div className="text-zinc-800">
                                                 {act.user ? (
@@ -676,34 +759,41 @@ export default function IssueDetailPage() {
                                         const isMyComment = cleanAuthor === cleanCommentUser;
                                         return (
                                             <div key={com.id} className="p-4 border border-zinc-100 rounded-md bg-zinc-50/30">
-                                                <div className="flex items-center gap-2 text-xs mb-2">
-                                                    <span className="text-[#4db6ac] font-bold">@{com.author?.replace('@', '')}</span>
-                                                    <span className="text-zinc-400">{getRelativeTimeString(com.created_at)}</span>
-                                                </div>
-                                                {editingCommentId === com.id ? (
-                                                    <div>
-                                                        <textarea
-                                                            value={editingCommentBody}
-                                                            onChange={e => setEditingCommentBody(e.target.value)}
-                                                            className="w-full p-2 border border-zinc-300 rounded text-sm outline-none focus:border-zinc-400"
-                                                            rows={2}
-                                                        />
-                                                        <div className="mt-2 flex gap-3 justify-end items-center">
-                                                            <button onClick={() => { setEditingCommentId(null); }} className="cursor-pointer text-zinc-400 hover:text-zinc-600 text-xs font-medium">Cancelar</button>
-                                                            <button onClick={() => handleSaveCommentEdit(com.id)} className="cursor-pointer bg-[#4db6ac] text-white px-3 py-1 rounded text-xs font-bold hover:bg-[#3ca398]">GUARDAR</button>
+                                                <div className="flex items-start gap-3">
+                                                    <UserAvatar username={com.author} size={30} />
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center gap-2 text-xs mb-2">
+                                                            <Link href={getProfileHref(com.author)} className="text-[#4db6ac] font-bold hover:underline">
+                                                                @{com.author?.replace('@', '')}
+                                                            </Link>
+                                                            <span className="text-zinc-400">{getRelativeTimeString(com.created_at)}</span>
                                                         </div>
-                                                    </div>
-                                                ) : (
-                                                    <React.Fragment>
-                                                        <p className="text-sm text-zinc-700 whitespace-pre-wrap">{com.body}</p>
-                                                        {isMyComment && (
-                                                            <div className="mt-3 flex gap-4 text-xs font-bold border-t border-zinc-100 pt-2">
-                                                                <button onClick={() => { setEditingCommentId(com.id); setEditingCommentBody(com.body); }} className="text-[#4db6ac] cursor-pointer hover:underline">Editar</button>
-                                                                <button onClick={() => handleDeleteCommentClick(com.id)} className="text-red-500 cursor-pointer hover:underline">Eliminar</button>
+                                                        {editingCommentId === com.id ? (
+                                                            <div>
+                                                                <textarea
+                                                                    value={editingCommentBody}
+                                                                    onChange={e => setEditingCommentBody(e.target.value)}
+                                                                    className="w-full p-2 border border-zinc-300 rounded text-sm outline-none focus:border-zinc-400"
+                                                                    rows={2}
+                                                                />
+                                                                <div className="mt-2 flex gap-3 justify-end items-center">
+                                                                    <button onClick={() => { setEditingCommentId(null); }} className="cursor-pointer text-zinc-400 hover:text-zinc-600 text-xs font-medium">Cancelar</button>
+                                                                    <button onClick={() => handleSaveCommentEdit(com.id)} className="cursor-pointer bg-[#4db6ac] text-white px-3 py-1 rounded text-xs font-bold hover:bg-[#3ca398]">GUARDAR</button>
+                                                                </div>
                                                             </div>
+                                                        ) : (
+                                                            <React.Fragment>
+                                                                <p className="text-sm text-zinc-700 whitespace-pre-wrap">{com.body}</p>
+                                                                {isMyComment && (
+                                                                    <div className="mt-3 flex gap-4 text-xs font-bold border-t border-zinc-100 pt-2">
+                                                                        <button onClick={() => { setEditingCommentId(com.id); setEditingCommentBody(com.body); }} className="text-[#4db6ac] cursor-pointer hover:underline">Editar</button>
+                                                                        <button onClick={() => handleDeleteCommentClick(com.id)} className="text-red-500 cursor-pointer hover:underline">Eliminar</button>
+                                                                    </div>
+                                                                )}
+                                                            </React.Fragment>
                                                         )}
-                                                    </React.Fragment>
-                                                )}
+                                                    </div>
+                                                </div>
                                             </div>
                                         );
                                     })}
