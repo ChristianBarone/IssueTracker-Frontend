@@ -146,7 +146,7 @@ export default function SettingsPage() {
     const reloadCurrent = useCallback(async () => {
         if (!apiKey) return;
         const data = await fetchEntities(activeTab, apiKey);
-        setAllItems(prev => ({ ...prev, [activeTab]: data }));
+        setAllItems(prev => ({...prev, [activeTab]: data}));
     }, [activeTab, apiKey]);
 
     useEffect(() => {
@@ -191,13 +191,13 @@ export default function SettingsPage() {
     const openCreateModal = () => {
         setFormData(DEFAULT_FORM);
         setModalError(null);
-        setEditModal({ mode: 'create' });
+        setEditModal({mode: 'create'});
     };
 
     const openEditModal = (item: AnyEntity) => {
         setFormData(itemToForm(item));
         setModalError(null);
-        setEditModal({ mode: 'edit', item });
+        setEditModal({mode: 'edit', item});
     };
 
     const handleSaveEdit = async (e: React.FormEvent) => {
@@ -225,7 +225,7 @@ export default function SettingsPage() {
     const openDeleteModal = (item: AnyEntity) => {
         const others = items.filter(i => i.id !== item.id);
         setDeleteError(null);
-        setDeleteModal({ item, replacementId: others.length > 0 ? others[0].id : null });
+        setDeleteModal({item, replacementId: others.length > 0 ? others[0].id : null});
     };
 
     const handleConfirmDelete = async () => {
@@ -272,7 +272,7 @@ export default function SettingsPage() {
                     </div>
                     <Link
                         href="/issues"
-                        className="inline-flex items-center gap-2 rounded-[10px] bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 shadow-[0_4px_0_#cbd5e1] transition-transform hover:-translate-y-px"
+                        className="inline-flex items-center gap-2 rounded-[10px] bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 shadow-[0_4px_0_#cbd5e1] transition-transform hover:-translate-y-px cursor-pointer"
                     >
                         ← Back to Issues
                     </Link>
@@ -283,7 +283,7 @@ export default function SettingsPage() {
                         {pageError}
                         <button
                             onClick={loadAll}
-                            className="ml-3 font-bold underline hover:no-underline"
+                            className="ml-3 font-bold underline hover:no-underline cursor-pointer"
                         >
                             Retry
                         </button>
@@ -291,7 +291,8 @@ export default function SettingsPage() {
                 )}
 
                 {/* Main card */}
-                <div className="overflow-hidden rounded-[18px] border border-slate-200/90 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+                <div
+                    className="overflow-hidden rounded-[18px] border border-slate-200/90 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
 
                     {/* Tabs */}
                     <div className="flex overflow-x-auto border-b border-slate-200 bg-[#fbfcfe]">
@@ -303,7 +304,7 @@ export default function SettingsPage() {
                                 <button
                                     key={entity}
                                     onClick={() => setActiveTab(entity)}
-                                    className={`inline-flex shrink-0 items-center whitespace-nowrap border-r border-slate-200 px-5 py-4 text-sm font-bold transition-colors ${
+                                    className={`inline-flex shrink-0 items-center whitespace-nowrap border-r border-slate-200 px-5 py-4 text-sm font-bold transition-colors cursor-pointer ${
                                         isActive
                                             ? 'bg-white text-slate-800 shadow-[inset_0_-3px_0_#2f93b8]'
                                             : 'text-slate-500 hover:bg-white/60 hover:text-slate-700'
@@ -335,7 +336,7 @@ export default function SettingsPage() {
                             </div>
                             <button
                                 onClick={openCreateModal}
-                                className="inline-flex shrink-0 items-center gap-2 rounded-[10px] bg-gradient-to-b from-[#82e9de] to-[#59d8cc] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-[0_6px_0_#40bbb1] transition-transform hover:-translate-y-px"
+                                className="inline-flex shrink-0 items-center gap-2 rounded-[10px] bg-gradient-to-b from-[#82e9de] to-[#59d8cc] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-[0_6px_0_#40bbb1] transition-transform hover:-translate-y-px cursor-pointer"
                             >
                                 + ADD NEW {config.singular.toUpperCase()}
                             </button>
@@ -345,157 +346,159 @@ export default function SettingsPage() {
                         {loading ? (
                             <div className="py-14 text-center text-slate-400">Loading settings…</div>
                         ) : items.length === 0 ? (
-                            <div className="rounded-[14px] border border-slate-200 bg-slate-50 py-12 text-center text-slate-400">
+                            <div
+                                className="rounded-[14px] border border-slate-200 bg-slate-50 py-12 text-center text-slate-400">
                                 No {config.label.toLowerCase()} yet. Add one above.
                             </div>
                         ) : (
                             <div className="overflow-hidden rounded-[12px] border border-slate-200">
                                 <table className="w-full text-sm">
                                     <thead>
-                                        <tr className="border-b border-slate-200 bg-slate-50">
-                                            {config.hasOrder && (
-                                                <th className="w-20 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                                    Order
-                                                </th>
-                                            )}
-                                            <th className="w-14 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                                Color
+                                    <tr className="border-b border-slate-200 bg-slate-50">
+                                        {config.hasOrder && (
+                                            <th className="w-20 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                                Order
                                             </th>
+                                        )}
+                                        <th className="w-14 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                            Color
+                                        </th>
+                                        <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                            Name
+                                        </th>
+                                        {activeTab === 'statuses' && (
                                             <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                                Name
+                                                Slug
                                             </th>
-                                            {activeTab === 'statuses' && (
-                                                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                                    Slug
-                                                </th>
-                                            )}
-                                            {activeTab === 'statuses' && (
-                                                <th className="w-24 px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                                    Closed
-                                                </th>
-                                            )}
-                                            {config.hasDefault && (
-                                                <th className="w-24 px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                                    Default
-                                                </th>
-                                            )}
-                                            {activeTab === 'due-dates' && (
-                                                <th className="w-20 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                                    Days
-                                                </th>
-                                            )}
-                                            {activeTab === 'due-dates' && (
-                                                <th className="w-28 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                                    Timing
-                                                </th>
-                                            )}
-                                            <th className="w-32 px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                                Actions
+                                        )}
+                                        {activeTab === 'statuses' && (
+                                            <th className="w-24 px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                                Closed
                                             </th>
-                                        </tr>
+                                        )}
+                                        {config.hasDefault && (
+                                            <th className="w-24 px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                                Default
+                                            </th>
+                                        )}
+                                        {activeTab === 'due-dates' && (
+                                            <th className="w-20 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                                Days
+                                            </th>
+                                        )}
+                                        {activeTab === 'due-dates' && (
+                                            <th className="w-28 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                                Timing
+                                            </th>
+                                        )}
+                                        <th className="w-32 px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                            Actions
+                                        </th>
+                                    </tr>
                                     </thead>
                                     <tbody>
-                                        {items.map((item, idx) => {
-                                            const statusItem = item as StatusEntity;
-                                            const dueDateItem = item as DueDateEntity;
-                                            const defaultItem = item as OrderedDefaultEntity;
-                                            const isFirst = idx === 0;
-                                            const isLast = idx === items.length - 1;
-                                            const canDelete = !config.needsReplacement || items.length > 1;
+                                    {items.map((item, idx) => {
+                                        const statusItem = item as StatusEntity;
+                                        const dueDateItem = item as DueDateEntity;
+                                        const defaultItem = item as OrderedDefaultEntity;
+                                        const isFirst = idx === 0;
+                                        const isLast = idx === items.length - 1;
+                                        const canDelete = !config.needsReplacement || items.length > 1;
 
-                                            return (
-                                                <tr
-                                                    key={item.id}
-                                                    className="border-b border-slate-100 transition-colors last:border-b-0 hover:bg-slate-50/50"
-                                                >
-                                                    {config.hasOrder && (
-                                                        <td className="px-4 py-3">
-                                                            <div className="flex gap-0.5">
-                                                                <button
-                                                                    onClick={() => handleMoveUp(item.id)}
-                                                                    disabled={isFirst || busy}
-                                                                    className="rounded-[6px] p-1.5 text-[11px] text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-20"
-                                                                    title="Move up"
-                                                                >
-                                                                    ▲
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleMoveDown(item.id)}
-                                                                    disabled={isLast || busy}
-                                                                    className="rounded-[6px] p-1.5 text-[11px] text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-20"
-                                                                    title="Move down"
-                                                                >
-                                                                    ▼
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    )}
+                                        return (
+                                            <tr
+                                                key={item.id}
+                                                className="border-b border-slate-100 transition-colors last:border-b-0 hover:bg-slate-50/50"
+                                            >
+                                                {config.hasOrder && (
                                                     <td className="px-4 py-3">
-                                                        <span
-                                                            className="inline-block h-6 w-6 rounded-[4px] border border-slate-200"
-                                                            style={{ backgroundColor: item.color || '#cbd5e1' }}
-                                                        />
-                                                    </td>
-                                                    <td className="px-4 py-3 font-medium text-slate-800">
-                                                        {item.name}
-                                                    </td>
-                                                    {activeTab === 'statuses' && (
-                                                        <td className="px-4 py-3 font-mono text-xs text-slate-400">
-                                                            {statusItem.slug || '—'}
-                                                        </td>
-                                                    )}
-                                                    {activeTab === 'statuses' && (
-                                                        <td className="px-4 py-3 text-center">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={!!statusItem.is_closed}
-                                                                onChange={() => handleToggleClosed(statusItem)}
-                                                                disabled={busy}
-                                                                className="h-4 w-4 cursor-pointer accent-[#2f93b8]"
-                                                                title="Toggle closed state"
-                                                            />
-                                                        </td>
-                                                    )}
-                                                    {config.hasDefault && (
-                                                        <td className="px-4 py-3 text-center">
-                                                            {defaultItem.is_default && (
-                                                                <span className="inline-flex items-center rounded-full bg-[#e8f6fb] px-2 py-0.5 text-[11px] font-bold text-[#1784a8]">
-                                                                    Default
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                    )}
-                                                    {activeTab === 'due-dates' && (
-                                                        <td className="px-4 py-3 text-slate-600">
-                                                            {dueDateItem.days_offset ?? '—'}
-                                                        </td>
-                                                    )}
-                                                    {activeTab === 'due-dates' && (
-                                                        <td className="px-4 py-3 capitalize text-slate-600">
-                                                            {dueDateItem.before_or_after || '—'}
-                                                        </td>
-                                                    )}
-                                                    <td className="px-4 py-3">
-                                                        <div className="flex justify-end gap-2">
+                                                        <div className="flex gap-0.5">
                                                             <button
-                                                                onClick={() => openEditModal(item)}
-                                                                className="rounded-[8px] bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-200"
+                                                                onClick={() => handleMoveUp(item.id)}
+                                                                disabled={isFirst || busy}
+                                                                className="rounded-[6px] p-1.5 text-[11px] text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-20 cursor-pointer"
+                                                                title="Move up"
                                                             >
-                                                                Edit
+                                                                ▲
                                                             </button>
                                                             <button
-                                                                onClick={() => canDelete && openDeleteModal(item)}
-                                                                disabled={!canDelete}
-                                                                title={!canDelete ? 'Cannot delete the only remaining item' : undefined}
-                                                                className="rounded-[8px] bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-500 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-30"
+                                                                onClick={() => handleMoveDown(item.id)}
+                                                                disabled={isLast || busy}
+                                                                className="rounded-[6px] p-1.5 text-[11px] text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-20 cursor-pointer"
+                                                                title="Move down"
                                                             >
-                                                                Delete
+                                                                ▼
                                                             </button>
                                                         </div>
                                                     </td>
-                                                </tr>
-                                            );
-                                        })}
+                                                )}
+                                                <td className="px-4 py-3">
+                                                        <span
+                                                            className="inline-block h-6 w-6 rounded-[4px] border border-slate-200"
+                                                            style={{backgroundColor: item.color || '#cbd5e1'}}
+                                                        />
+                                                </td>
+                                                <td className="px-4 py-3 font-medium text-slate-800">
+                                                    {item.name}
+                                                </td>
+                                                {activeTab === 'statuses' && (
+                                                    <td className="px-4 py-3 font-mono text-xs text-slate-400">
+                                                        {statusItem.slug || '—'}
+                                                    </td>
+                                                )}
+                                                {activeTab === 'statuses' && (
+                                                    <td className="px-4 py-3 text-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={!!statusItem.is_closed}
+                                                            onChange={() => handleToggleClosed(statusItem)}
+                                                            disabled={busy}
+                                                            className="h-4 w-4 cursor-pointer accent-[#2f93b8]"
+                                                            title="Toggle closed state"
+                                                        />
+                                                    </td>
+                                                )}
+                                                {config.hasDefault && (
+                                                    <td className="px-4 py-3 text-center">
+                                                        {defaultItem.is_default && (
+                                                            <span
+                                                                className="inline-flex items-center rounded-full bg-[#e8f6fb] px-2 py-0.5 text-[11px] font-bold text-[#1784a8]">
+                                                                    Default
+                                                                </span>
+                                                        )}
+                                                    </td>
+                                                )}
+                                                {activeTab === 'due-dates' && (
+                                                    <td className="px-4 py-3 text-slate-600">
+                                                        {dueDateItem.days_offset ?? '—'}
+                                                    </td>
+                                                )}
+                                                {activeTab === 'due-dates' && (
+                                                    <td className="px-4 py-3 capitalize text-slate-600">
+                                                        {dueDateItem.before_or_after || '—'}
+                                                    </td>
+                                                )}
+                                                <td className="px-4 py-3">
+                                                    <div className="flex justify-end gap-2">
+                                                        <button
+                                                            onClick={() => openEditModal(item)}
+                                                            className="rounded-[8px] bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-200 cursor-pointer"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => canDelete && openDeleteModal(item)}
+                                                            disabled={!canDelete}
+                                                            title={!canDelete ? 'Cannot delete the only remaining item' : undefined}
+                                                            className="rounded-[8px] bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-500 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-30 cursor-pointer"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                     </tbody>
                                 </table>
                             </div>
@@ -507,41 +510,45 @@ export default function SettingsPage() {
             {/* ── Edit / Create Modal ──────────────────────────────────────────── */}
             {editModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                    <div className="w-full max-w-md rounded-[18px] border border-slate-200 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
+                    <div
+                        className="w-full max-w-md rounded-[18px] border border-slate-200 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
                         <h3 className="mb-5 text-[20px] font-bold text-slate-900">
                             {editModal.mode === 'create' ? `Add New ${config.singular}` : `Edit ${config.singular}`}
                         </h3>
 
                         <form onSubmit={handleSaveEdit} className="grid gap-4">
                             {modalError && (
-                                <div className="rounded-[12px] border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+                                <div
+                                    className="rounded-[12px] border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
                                     {modalError}
                                 </div>
                             )}
 
                             <div>
-                                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                                <label
+                                    className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
                                     Name
                                 </label>
                                 <input
                                     type="text"
                                     required
                                     value={formData.name}
-                                    onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                                    onChange={e => setFormData(prev => ({...prev, name: e.target.value}))}
                                     className="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#2f93b8] focus:ring-2 focus:ring-[#2f93b8]/10"
                                     placeholder={`${config.singular} name`}
                                 />
                             </div>
 
                             <div>
-                                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                                <label
+                                    className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
                                     Color
                                 </label>
                                 <div className="flex items-center gap-3">
                                     <input
                                         type="color"
                                         value={formData.color}
-                                        onChange={e => setFormData(prev => ({ ...prev, color: e.target.value }))}
+                                        onChange={e => setFormData(prev => ({...prev, color: e.target.value}))}
                                         className="h-10 w-16 cursor-pointer rounded-[8px] border border-slate-200 p-0.5"
                                     />
                                     <span className="font-mono text-sm text-slate-500">{formData.color}</span>
@@ -549,26 +556,30 @@ export default function SettingsPage() {
                             </div>
 
                             {config.hasClosed && (
-                                <label className="flex cursor-pointer items-center gap-3 rounded-[10px] border border-slate-200 p-3 hover:bg-slate-50">
+                                <label
+                                    className="flex cursor-pointer items-center gap-3 rounded-[10px] border border-slate-200 p-3 hover:bg-slate-50">
                                     <input
                                         type="checkbox"
                                         checked={formData.is_closed}
-                                        onChange={e => setFormData(prev => ({ ...prev, is_closed: e.target.checked }))}
+                                        onChange={e => setFormData(prev => ({...prev, is_closed: e.target.checked}))}
                                         className="h-4 w-4 accent-[#2f93b8]"
                                     />
                                     <div>
                                         <div className="text-sm font-semibold text-slate-700">Is Closed</div>
-                                        <div className="text-xs text-slate-400">Issues with this status count as closed</div>
+                                        <div className="text-xs text-slate-400">Issues with this status count as
+                                            closed
+                                        </div>
                                     </div>
                                 </label>
                             )}
 
                             {config.hasDefault && (
-                                <label className="flex cursor-pointer items-center gap-3 rounded-[10px] border border-slate-200 p-3 hover:bg-slate-50">
+                                <label
+                                    className="flex cursor-pointer items-center gap-3 rounded-[10px] border border-slate-200 p-3 hover:bg-slate-50">
                                     <input
                                         type="checkbox"
                                         checked={formData.is_default}
-                                        onChange={e => setFormData(prev => ({ ...prev, is_default: e.target.checked }))}
+                                        onChange={e => setFormData(prev => ({...prev, is_default: e.target.checked}))}
                                         className="h-4 w-4 accent-[#2f93b8]"
                                     />
                                     <div>
@@ -581,19 +592,24 @@ export default function SettingsPage() {
                             {config.hasDaysOffset && (
                                 <>
                                     <div>
-                                        <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                                        <label
+                                            className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
                                             Days Offset
                                         </label>
                                         <input
                                             type="number"
                                             min="0"
                                             value={formData.days_offset}
-                                            onChange={e => setFormData(prev => ({ ...prev, days_offset: e.target.value }))}
+                                            onChange={e => setFormData(prev => ({
+                                                ...prev,
+                                                days_offset: e.target.value
+                                            }))}
                                             className="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#2f93b8] focus:ring-2 focus:ring-[#2f93b8]/10"
                                         />
                                     </div>
                                     <div>
-                                        <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                                        <label
+                                            className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
                                             Timing
                                         </label>
                                         <select
@@ -602,7 +618,7 @@ export default function SettingsPage() {
                                                 ...prev,
                                                 before_or_after: e.target.value as 'before' | 'after',
                                             }))}
-                                            className="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#2f93b8]"
+                                            className="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#2f93b8] cursor-pointer"
                                         >
                                             <option value="before">Before due date</option>
                                             <option value="after">After due date</option>
@@ -615,14 +631,14 @@ export default function SettingsPage() {
                                 <button
                                     type="button"
                                     onClick={() => setEditModal(null)}
-                                    className="rounded-[10px] bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-200"
+                                    className="rounded-[10px] bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-200 cursor-pointer"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={busy}
-                                    className="rounded-[10px] bg-gradient-to-b from-[#82e9de] to-[#59d8cc] px-5 py-2.5 text-sm font-bold text-slate-900 shadow-[0_4px_0_#40bbb1] transition-transform hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="rounded-[10px] bg-gradient-to-b from-[#82e9de] to-[#59d8cc] px-5 py-2.5 text-sm font-bold text-slate-900 shadow-[0_4px_0_#40bbb1] transition-transform hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
                                 >
                                     {busy ? 'Saving…' : 'Save'}
                                 </button>
@@ -635,13 +651,15 @@ export default function SettingsPage() {
             {/* ── Delete Modal ─────────────────────────────────────────────────── */}
             {deleteModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                    <div className="w-full max-w-md rounded-[18px] border border-slate-200 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
+                    <div
+                        className="w-full max-w-md rounded-[18px] border border-slate-200 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
                         <h3 className="mb-1 text-[18px] font-bold text-slate-900">
                             Delete value: <span className="text-rose-500">{deleteModal.item.name}</span>
                         </h3>
 
                         {deleteError && (
-                            <div className="my-4 rounded-[12px] border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+                            <div
+                                className="my-4 rounded-[12px] border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
                                 {deleteError}
                             </div>
                         )}
@@ -652,15 +670,16 @@ export default function SettingsPage() {
                                     Issues currently using <strong>{deleteModal.item.name}</strong> will be
                                     reassigned to the selected replacement value.
                                 </p>
-                                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                                <label
+                                    className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
                                     Replacement
                                 </label>
                                 <select
                                     value={deleteModal.replacementId ?? ''}
                                     onChange={e => setDeleteModal(prev =>
-                                        prev ? { ...prev, replacementId: Number(e.target.value) } : prev
+                                        prev ? {...prev, replacementId: Number(e.target.value)} : prev
                                     )}
-                                    className="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#2f93b8]"
+                                    className="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#2f93b8] cursor-pointer"
                                 >
                                     {items.filter(i => i.id !== deleteModal.item.id).map(i => (
                                         <option key={i.id} value={i.id}>{i.name}</option>
@@ -678,7 +697,7 @@ export default function SettingsPage() {
                             <button
                                 type="button"
                                 onClick={() => setDeleteModal(null)}
-                                className="rounded-[10px] bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-200"
+                                className="rounded-[10px] bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-200 cursor-pointer"
                             >
                                 Cancel
                             </button>
@@ -686,7 +705,7 @@ export default function SettingsPage() {
                                 type="button"
                                 onClick={handleConfirmDelete}
                                 disabled={busy}
-                                className="rounded-[10px] bg-rose-500 px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_0_#fca5a5] transition-transform hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
+                                className="rounded-[10px] bg-rose-500 px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_0_#fca5a5] transition-transform hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
                             >
                                 {busy ? 'Deleting…' : 'Delete'}
                             </button>
