@@ -44,6 +44,7 @@ export interface ProfileData {
     open_assigned_issues: ProfileIssue[];
     comments: Array<{
         id: number;
+        issue_id?: number;
         author: string;
         body: string;
         created_at: string;

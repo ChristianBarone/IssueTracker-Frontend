@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
 import { getApiBaseUrl } from '../../lib/apiBaseUrl';
-import { getStoredApiKey, USERNAMES } from '../../lib/auth';
+import { AUTH_USERS, getStoredApiKey, getStoredUsername, getUserIdByUsername } from '../../lib/auth';
 import { fetchEntities } from '../../settings/settingsService';
 
 export default function CreateIssuePage() {
@@ -14,11 +14,12 @@ export default function CreateIssuePage() {
         subject: '',
         description: '',
         status: 'In Progress',
-        assigned_to: 'Unassigned',
+        assigned_to: '',
         issue_type: 'Bug',
         issue_severity: 'Normal',
         priority: 'Normal',
-        deadline: ''
+        deadline: '',
+        files: [] as File[],
     });
 
     const [statuses, setStatuses] = useState<Array<{ name: string }>>([]);
@@ -29,6 +30,11 @@ export default function CreateIssuePage() {
     const [statusMessage, setStatusMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
     const getApiKey = () => getStoredApiKey();
+    const currentUser = getStoredUsername();
+    const currentUserId = useMemo(() => {
+        if (!currentUser) return null;
+        return getUserIdByUsername(currentUser);
+    }, [currentUser]);
 
     useEffect(() => {
         const loadEntities = async () => {
@@ -55,13 +61,22 @@ export default function CreateIssuePage() {
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value
-        });
+        const target = e.target as HTMLInputElement;
+
+        if (target.type === 'file' && target.files) {
+            setFormData({
+                ...formData,
+                files: Array.from(target.files)
+            });
+        } else {
+            setFormData({
+                ...formData,
+                [e.target.name]: e.target.value
+            });
+        }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.SubmitEvent) => {
         e.preventDefault();
         setLoading(true);
         setStatusMessage(null);
@@ -93,9 +108,13 @@ export default function CreateIssuePage() {
                 dataEnvelope.append('deadline', formData.deadline);
             }
 
-            if (formData.assigned_to !== 'Unassigned') {
+            if (formData.assigned_to) {
                 dataEnvelope.append('assignee', formData.assigned_to);
             }
+
+            formData.files.forEach(file => {
+                dataEnvelope.append('files', file);
+            });
 
             const baseUrl = getApiBaseUrl();
             const response = await fetchWithTimeout(`${baseUrl}/issues/`, {
@@ -109,12 +128,18 @@ export default function CreateIssuePage() {
             const data = await response.json().catch(() => ({}));
 
             if (response.ok) {
-                setStatusMessage({ text: `¡Issue #${data.id} creat amb èxit!`, isError: false });
+                setStatusMessage({ text: `Successfully created issue #${data.id}!`, isError: false });
                 router.push('/issues');
             } else {
                 console.error("Detalle del error de Django:", data);
+
+                let serverError = 'Error del servidor al validar los campos.';
+                if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+                    serverError = JSON.stringify(data);
+                }
+
                 setStatusMessage({
-                    text: data.error || data.message || 'Error del servidor al validar los campos.',
+                    text: data.error || data.message || serverError,
                     isError: true
                 });
             }
@@ -124,6 +149,7 @@ export default function CreateIssuePage() {
             setLoading(false);
         }
     };
+
     const handleCancel = () => {
         router.push('/issues');
     };
@@ -132,12 +158,10 @@ export default function CreateIssuePage() {
         <div className="min-h-screen bg-[#f4f7f9] text-[#333] font-sans flex flex-col items-center justify-start py-12 px-4">
             <div className="w-full max-w-5xl bg-white rounded-lg shadow-sm border border-zinc-200/60 p-8">
 
-                {/* TÍTOL CENTRAL DE LA INTERFÍCIE */}
                 <h1 className="text-center text-[28px] font-normal text-[#2c3e50] mb-8">
                     New issue
                 </h1>
 
-                {/* FEEDBACK */}
                 {statusMessage && (
                     <div className={`p-4 mb-6 rounded-md text-sm font-medium border ${
                         statusMessage.isError
@@ -152,7 +176,6 @@ export default function CreateIssuePage() {
 
                     {/* CONTINGUT */}
                     <div className="md:col-span-2 flex flex-col gap-5">
-                        {/* SUBJECT */}
                         <div className="flex flex-col gap-1">
                             <input
                                 type="text"
@@ -167,7 +190,6 @@ export default function CreateIssuePage() {
                             </button>
                         </div>
 
-                        {/* DESCRIPCIÓ */}
                         <div>
                             <textarea
                                 name="description"
@@ -179,25 +201,17 @@ export default function CreateIssuePage() {
                             />
                         </div>
 
-                        {/* ATTACHMENTS */}
                         <div className="flex flex-col gap-2">
-                            <span className="text-base font-medium text-[#2c3e50]">Add attachments</span>
-                            <div className="border border-dashed border-zinc-300 rounded p-8 text-center text-zinc-400 bg-zinc-50/50 text-sm">
-                                <input type="file" className="hidden" id="file-upload" disabled />
-                                <label htmlFor="file-upload" className="cursor-pointer">
-                                    <span className="border border-solid border-zinc-400 bg-zinc-200/60 px-3 py-1.5 rounded text-xs text-zinc-700 mr-2 shadow-sm">
-                                        Seleccionar archivo
-                                    </span>
-                                    Ningún archivo seleccionado
-                                </label>
+                            <span className="text-base font-medium text-[#2c3e50]">Add attachment</span>
+                            <div className="border border-dashed border-zinc-300 rounded p-8 text-center text-zinc-400 bg-zinc-50/50 text-sm cursor-pointer">
+                                <input type="file" className="cursor-pointer" onChange={handleChange} name="files"/>
                             </div>
                         </div>
                     </div>
 
-                    {/* ATRIBUTS  */}
+                    {/* ATRIBUTS */}
                     <div className="bg-[#f8fafc] border border-zinc-200/80 rounded p-5 flex flex-col gap-5 h-fit">
 
-                        {/* STATUS */}
                         <div className="flex flex-col gap-1.5">
                             <select
                                 name="status"
@@ -215,23 +229,34 @@ export default function CreateIssuePage() {
                             </select>
                         </div>
 
-                        {/* ASSIGNED TO */}
                         <div className="flex flex-col gap-1">
                             <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Assigned To</label>
-                            <select
-                                name="assigned_to"
-                                value={formData.assigned_to}
-                                onChange={handleChange}
-                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
-                            >
-                                <option value="Unassigned">Unassigned</option>
-                                {USERNAMES.map((user) => (
-                                    <option key={user} value={user}>{user}</option>
-                                ))}
-                            </select>
+                            <div className="flex flex-col gap-2">
+                                <select
+                                    name="assigned_to"
+                                    value={formData.assigned_to}
+                                    onChange={handleChange}
+                                    className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
+                                >
+                                    <option value="">Unassigned</option>
+                                    {AUTH_USERS.map((user) => (
+                                        <option key={user.id} value={String(user.id)}>{user.username}</option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData((prev) => ({
+                                        ...prev,
+                                        assigned_to: currentUserId == null ? '' : String(currentUserId)
+                                    }))}
+                                    disabled={currentUserId == null}
+                                    className="w-fit whitespace-nowrap border border-zinc-300 bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-700 rounded hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Assign to me
+                                </button>
+                            </div>
                         </div>
 
-                        {/* TYPE */}
                         <div className="flex flex-col gap-1">
                             <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Type</label>
                             <select
@@ -250,7 +275,6 @@ export default function CreateIssuePage() {
                             </select>
                         </div>
 
-                        {/* SEVERITY */}
                         <div className="flex flex-col gap-1">
                             <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Severity</label>
                             <select
@@ -269,7 +293,6 @@ export default function CreateIssuePage() {
                             </select>
                         </div>
 
-                        {/* PRIORITY */}
                         <div className="flex flex-col gap-1">
                             <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Priority</label>
                             <select
@@ -288,7 +311,6 @@ export default function CreateIssuePage() {
                             </select>
                         </div>
 
-                        {/* DEADLINE */}
                         <div className="flex flex-col gap-1">
                             <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Deadline</label>
                             <input
@@ -302,12 +324,11 @@ export default function CreateIssuePage() {
 
                     </div>
 
-                    {/* ACTIONS: CREATE I CANCEL */}
                     <div className="md:col-span-3 flex flex-col items-center gap-3 mt-4">
                         <button
                             type="submit"
                             disabled={loading}
-                            className={`w-full h-11 text-base font-medium uppercase tracking-wider rounded transition-colors ${
+                            className={`w-full h-11 text-base font-medium uppercase tracking-wider rounded transition-colors cursor-pointer ${
                                 loading
                                     ? 'bg-zinc-300 text-zinc-500 cursor-not-allowed'
                                     : 'bg-[#80cbd7] text-white hover:bg-[#4db6ac] shadow-sm'

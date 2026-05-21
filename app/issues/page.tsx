@@ -41,6 +41,7 @@ export default function IssuesPage() {
     const [priorityCounts, setPriorityCounts] = useState<BackendCounts>({});
     const [statusCounts, setStatusCounts] = useState<BackendCounts>({});
     const [statuses, setStatuses] = useState<Array<{ name: string; color?: string }>>([]);
+    const [assignedToCounts, setAssignedToCounts] = useState<BackendCounts>({});
 
     const [filters, setFilters] = useState<IssueFilterState>({
         search: '',
@@ -102,7 +103,6 @@ export default function IssuesPage() {
                         setError(null);
                     }
 
-                    // CORREGIDO: Tipado seguro sin usar 'any' para evitar que se queje el linter
                     const normalizedIssues = (data.issues || []).map((issue: Record<string, unknown>) => ({
                         ...issue,
                         id: Number(issue.id),
@@ -126,6 +126,7 @@ export default function IssuesPage() {
                     setSeverityCounts(data.severity_counts || {});
                     setStatusCounts(data.status_counts || {});
                     setPriorityCounts(data.priority_counts || {});
+                    setAssignedToCounts(data.assigned_to_counts || {});
 
                 }
             } catch (err) {
@@ -174,7 +175,7 @@ export default function IssuesPage() {
     const formatDate = (dateStr: string | null) => {
         if (!dateStr) return 'No date';
         const date = new Date(dateStr);
-        if (isNaN(date.getTime())) return dateStr;
+        if (Number.isNaN(date.getTime())) return dateStr;
         return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     };
 
@@ -196,7 +197,7 @@ export default function IssuesPage() {
 
     const getCountSafe = (countsObj: BackendCounts, key: string) => {
         if (!countsObj) return 0;
-        return countsObj[key] !== undefined ? countsObj[key] : (countsObj[key.toLowerCase()] !== undefined ? countsObj[key.toLowerCase()] : 0);
+        return countsObj[key] ?? (countsObj[key.toLowerCase()] !== undefined ? countsObj[key.toLowerCase()] : 0);
     };
 
     return (
@@ -297,7 +298,6 @@ export default function IssuesPage() {
                                             <input type="checkbox" checked={filters.priority.includes(p.name)} onChange={() => handleCheckboxChange('priority', p.name)} />
                                             {p.name}
                                         </label>
-                                        {/* CORREGIDO: Modificado font_weight por fontWeight */}
                                         <span style={{ backgroundColor: '#ebf0f5', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>
                                             {getCountSafe(priorityCounts, p.name)}
                                         </span>
@@ -319,6 +319,34 @@ export default function IssuesPage() {
                                     </div>
                                 ))}
                             </div>
+
+                            {/* AGREGADO: Sección de filtros visuales para "Assigned To" */}
+                            <div style={{ padding: '10px' }}>
+                                <h4 style={{ padding: '5px 10px', fontSize: '13px', color: '#34495e', margin: '0' }}>Assigned To</h4>
+                                {[
+                                    'Unassigned',
+                                    'Andreu-Caro',
+                                    'Marti-Piris',
+                                    'Hala-Alkhatib',
+                                    'Aleks-Shahverdyan',
+                                    'Christian-Alejandro-Barone',
+                                    'adminUser'
+                                ].map(user => (
+                                    <div key={user} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', backgroundColor: '#fcfcfc', marginBottom: '2px', borderLeft: '4px solid #64748b' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', fontSize: '14px', gap: '8px', cursor: 'pointer', color: '#64748b', margin: 0 }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={filters.assigned_to.includes(user)}
+                                                onChange={() => handleCheckboxChange('assigned_to', user)}
+                                            />
+                                            {user}
+                                        </label>
+                                        <span style={{ backgroundColor: '#ebf0f5', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>
+                                            {getCountSafe(assignedToCounts, user)}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
                         </aside>
                     )}
 
@@ -326,31 +354,31 @@ export default function IssuesPage() {
                         {loading ? (
                             <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>Fetching issues...</div>
                         ) : error ? (
-                                <div style={{ padding: '60px', textAlign: 'center', color: '#b91c1c' }}>{error}</div>
-                            ) : (
-                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                    <thead>
-                                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-                                        <th onClick={() => handleSort('issue_type')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                <span>TYPE</span>{renderSortIcon('issue_type')}
-                                            </div>
-                                        </th>
-                                        <th onClick={() => handleSort('issue_severity')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                <span>SEV.</span>{renderSortIcon('issue_severity')}
-                                            </div>
-                                        </th>
-                                        <th onClick={() => handleSort('priority')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                <span>PRIO.</span>{renderSortIcon('priority')}
-                                            </div>
-                                        </th>
-                                        <th onClick={() => handleSort('subject')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                <span>ISSUE</span>{renderSortIcon('subject')}
-                                            </div>
-                                        </th>
+                            <div style={{ padding: '60px', textAlign: 'center', color: '#b91c1c' }}>{error}</div>
+                        ) : (
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                                    <th onClick={() => handleSort('issue_type')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <span>TYPE</span>{renderSortIcon('issue_type')}
+                                        </div>
+                                    </th>
+                                    <th onClick={() => handleSort('issue_severity')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <span>SEV.</span>{renderSortIcon('issue_severity')}
+                                        </div>
+                                    </th>
+                                    <th onClick={() => handleSort('priority')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <span>PRIO.</span>{renderSortIcon('priority')}
+                                        </div>
+                                    </th>
+                                    <th onClick={() => handleSort('subject')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                                            <span>ISSUE</span>{renderSortIcon('subject')}
+                                        </div>
+                                    </th>
                                     <th onClick={() => handleSort('status')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '160px', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}>
                                         <div style={{ display: 'flex', alignItems: 'center' }}>
                                             <span>STATUS</span>{renderSortIcon('status')}

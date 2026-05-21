@@ -1,25 +1,29 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-    fetchIssueDetail, updateIssueFields, deleteIssue,
-    addComment, editComment, deleteComment
+    fetchIssueDetail, updateIssueFields, updateIssueAssignee, deleteIssue,
+    addComment, editComment, deleteComment, deleteAttachment, addAttachment 
 } from './detailService';
 import { IssueDetailData } from './types';
 import { getStoredUsername, getStoredApiKey } from '../../lib/auth';
 import { fetchEntities, AnyEntity } from '../../settings/settingsService';
+import { AUTH_USERS, getStoredUsername, getUserIdByUsername, getUserById } from '../../lib/auth';
 
 export default function IssueDetailPage() {
     const { id } = useParams();
     const router = useRouter();
     const issueId = Number(id);
 
+    const fileRef = useRef<HTMLInputElement>(null);
+
     const [issue, setIssue] = useState<IssueDetailData | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [uploading, setUploading] = useState<boolean>(false);
     const [activeTab, setActiveTab] = useState<'comments' | 'activities'>('comments');
-    const [currentUser, setCurrentUser] = useState<string | null>(null);
+    const [currentUser, setCurrentUser] = useState<string | null>(() => getStoredUsername() ?? null);
 
     const [newCommentBody, setNewCommentBody] = useState('');
     const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
@@ -43,11 +47,22 @@ export default function IssueDetailPage() {
 
     // Which inline picker is open: 'status'|'type'|'severity'|'priority'|'tags'|null
     const [openPicker, setOpenPicker] = useState<string | null>(null);
+    const [isSavingAssignee, setIsSavingAssignee] = useState(false);
+    const [assigneeMessage, setAssigneeMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
     const loadData = async () => {
         if (!issueId) return;
         const data = await fetchIssueDetail(issueId);
         if (data) {
+            // If backend returned an assignee object without a numeric id, try to map it to our local users
+            if (data.assignee && typeof data.assignee === 'object' && Number(data.assignee.id) === 0) {
+                const assigneeUsername = 'username' in data.assignee ? String(data.assignee.username || '') : '';
+                const possibleId = getUserIdByUsername(assigneeUsername);
+                if (possibleId != null) {
+                    data.assignee = getUserById(possibleId) ?? { id: possibleId, username: assigneeUsername };
+                }
+            }
+
             setIssue(data);
             setSubjectInput(data.subject);
             setDescriptionInput(data.description || '');
@@ -58,33 +73,34 @@ export default function IssueDetailPage() {
     useEffect(() => { loadData(); }, [issueId]);
 
     useEffect(() => {
-        const loadEntities = async () => {
-            const apiKey = getStoredApiKey();
-            if (!apiKey) return;
-            try {
-                const [typeList, severityList, priorityList, statusList, tagList] = await Promise.all([
-                    fetchEntities('types', apiKey),
-                    fetchEntities('severities', apiKey),
-                    fetchEntities('priorities', apiKey),
-                    fetchEntities('statuses', apiKey),
-                    fetchEntities('tags', apiKey),
-                ]);
-                setTypes(typeList);
-                setSeverities(severityList);
-                setPriorities(priorityList);
-                setStatuses(statusList);
-                setAllTags(tagList);
-            } catch (err) {
-                console.error('Error loading entities:', err);
-            }
-        };
-        loadEntities();
-    }, []);
+    const loadEntities = async () => {
+              const apiKey = getStoredApiKey();
+              if (!apiKey) return;
+              try {
+                  const [typeList, severityList, priorityList, statusList, tagList] = await Promise.all([
+                      fetchEntities('types', apiKey),
+                      fetchEntities('severities', apiKey),
+                      fetchEntities('priorities', apiKey),
+                      fetchEntities('statuses', apiKey),
+                      fetchEntities('tags', apiKey),
+                  ]);
+                  setTypes(typeList);
+                  setSeverities(severityList);
+                  setPriorities(priorityList);
+                  setStatuses(statusList);
+                  setAllTags(tagList);
+              } catch (err) {
+                  console.error('Error loading entities:', err);
+              }
+          };
+          loadEntities();
+      }, []);
 
-    useEffect(() => {
-        const storedUser = getStoredUsername();
-        setCurrentUser(storedUser);
-        const onStorage = () => setCurrentUser(getStoredUsername());
+      useEffect(() => {
+          const onStorage = () => {
+              const nextUser = getStoredUsername() ?? null;
+              setCurrentUser(nextUser);
+          };
         globalThis.addEventListener('storage', onStorage);
         return () => globalThis.removeEventListener('storage', onStorage);
     }, []);
@@ -108,7 +124,7 @@ export default function IssueDetailPage() {
         if (success) {
             setIsEditingSubject(false);
             setSubjectError('');
-            loadData();
+            await loadData();
         }
     };
 
@@ -116,7 +132,7 @@ export default function IssueDetailPage() {
         const success = await updateIssueFields(issueId, { [fieldKey]: optionId });
         if (success) {
             setOpenPicker(null);
-            loadData();
+            await loadData();
         }
     };
 
@@ -124,7 +140,7 @@ export default function IssueDetailPage() {
         const success = await updateIssueFields(issueId, { description: descriptionInput });
         if (success) {
             setIsEditingDescription(false);
-            loadData();
+            await loadData();
         }
     };
 
@@ -132,7 +148,7 @@ export default function IssueDetailPage() {
         const success = await updateIssueFields(issueId, { deadline: value });
         if (success) {
             setIsEditingDeadline(false);
-            loadData();
+            await loadData();
         }
     };
 
@@ -140,7 +156,7 @@ export default function IssueDetailPage() {
         if (!issue) return;
         const newTagIds = issue.tags.filter(t => t.id !== tagId).map(t => t.id);
         const success = await updateIssueFields(issueId, { tags: newTagIds });
-        if (success) loadData();
+        if (success) await loadData();
     };
 
     const handleAddTag = async (tagId: number) => {
@@ -151,16 +167,17 @@ export default function IssueDetailPage() {
         if (success) {
             setOpenPicker(null);
             loadData();
+            await loadData();
         }
     };
 
-    const handlePublishComment = async (e: React.FormEvent) => {
+    const handlePublishComment = async (e: React.SubmitEvent) => {
         e.preventDefault();
         if (!newCommentBody.trim()) return;
         const success = await addComment(issueId, newCommentBody);
         if (success) {
             setNewCommentBody('');
-            loadData();
+            await loadData();
         }
     };
 
@@ -169,14 +186,14 @@ export default function IssueDetailPage() {
         const success = await editComment(commentId, editingCommentBody);
         if (success) {
             setEditingCommentId(null);
-            loadData();
+            await loadData();
         }
     };
 
     const handleDeleteCommentClick = async (commentId: number) => {
         if (confirm('Are you sure you want to delete this comment?')) {
             const success = await deleteComment(commentId);
-            if (success) loadData();
+            if (success) await loadData();
         }
     };
 
@@ -187,6 +204,80 @@ export default function IssueDetailPage() {
         }
     };
 
+    const handleAssigneeSelectChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const nextValue = e.target.value;
+        setIsSavingAssignee(true);
+        setAssigneeMessage(null);
+        const result = await updateIssueAssignee(issueId, nextValue ? Number(nextValue) : null);
+        if (result.ok) {
+            // Optimistic UI: use local mapping so the select shows the new assignee
+            const newId = nextValue ? Number(nextValue) : null;
+            if (newId != null) {
+                setIssue(prev => prev ? { ...prev, assignee: getUserById(newId) ?? { id: newId, username: AUTH_USERS.find(u=>u.id===newId)?.username ?? '' } } : prev);
+            } else {
+                setIssue(prev => prev ? { ...prev, assignee: null } : prev);
+            }
+            await loadData();
+            setAssigneeMessage({ text: 'Assignee updated.', isError: false });
+        } else {
+            const detail = result.status ? ` (${result.status})` : '';
+            setAssigneeMessage({ text: `${result.message || 'Could not update assignee'}${detail}`, isError: true });
+        }
+        setIsSavingAssignee(false);
+    };
+
+    const handleAssignToMe = async () => {
+        if (!currentUser) return;
+        const myId = getUserIdByUsername(currentUser);
+        if (myId == null) return;
+
+        setIsSavingAssignee(true);
+        setAssigneeMessage(null);
+        const result = await updateIssueAssignee(issueId, myId);
+        if (result.ok) {
+            // Optimistic UI update: set local assignee to our known user so UI reflects it even if profile endpoints are flaky
+            setIssue(prev => prev ? { ...prev, assignee: getUserById(myId) ?? { id: myId, username: getUserById(myId)?.username ?? '' } } : prev);
+            await loadData();
+            setAssigneeMessage({ text: 'Assigned to you.', isError: false });
+        } else {
+            const detail = result.status ? ` (${result.status})` : '';
+            setAssigneeMessage({ text: `${result.message || 'Could not assign to you'}${detail}`, isError: true });
+        }
+        setIsSavingAssignee(false);
+    };
+
+    const handleAddAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        try {
+            setUploading(true);
+            const body = new FormData();
+            let success = false;
+
+            if (e.target.type === 'file' && e.target.files) {
+                const files = Array.from(e.target.files)
+
+                files.forEach(file => {
+                    body.append('files', file)
+                })
+            }
+            else return
+
+            if (issue !== null) {
+                success = await addAttachment(issue.id, body)
+            }
+
+            if (success) await loadData();
+        } catch {
+            console.log('Error de connexió amb el Back-End.');
+        } finally {
+            setUploading(false);
+        }
+    }
+
+    const handleDeleteAttachmentClick= async (attachmentId: number) => {
+        const success = await deleteAttachment(attachmentId)
+        if (success) await loadData();
+    }
+
     const getRelativeTimeString = (dateString: string) => {
         const diffMs = Math.abs(Date.now() - new Date(dateString).getTime());
         const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -195,7 +286,7 @@ export default function IssueDetailPage() {
         if (diffDays < 7) return `${diffDays} days ago`;
         const weeks = Math.floor(diffDays / 7);
         const remainingDays = diffDays % 7;
-        return `${weeks} week${weeks > 1 ? 's' : ''}, ${remainingDays} day${remainingDays !== 1 ? 's' : ''} ago`;
+        return `${weeks} week${weeks > 1 ? 's' : ''}, ${remainingDays} day${remainingDays === 1 ? '' : 's'} ago`;
     };
 
     if (loading) return <div className="p-10 text-center text-zinc-400 font-medium">Loading issue data...</div>;
@@ -260,6 +351,40 @@ export default function IssueDetailPage() {
             </div>
         </div>
     );
+     // Variables needed by the assignee/watchers/delete sections from main
+      const issueExt = issue as unknown as {
+          watchers?: Array<{ id: number; username: string } | string>;
+      };
+
+      let assigneeName = 'Unassigned';
+      if (issue.assignee) {
+          if (typeof issue.assignee === 'string') assigneeName = issue.assignee;
+          else if (typeof issue.assignee === 'object' && 'username' in issue.assignee) assigneeName =
+  (issue.assignee as { username: string }).username;
+      }
+
+      const currentWatchers = issueExt.watchers || [];
+      const isMyIssue = isCreator;
+      const currentAssigneeValue = (() => {
+          if (!issue.assignee) return '';
+          try {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const asAny: any = issue.assignee;
+              if (asAny && typeof asAny === 'object' && Number.isFinite(asAny.id) && asAny.id > 0) {
+                  return String(asAny.id);
+              }
+              const rawUsername = (typeof issue.assignee === 'string') ? issue.assignee :
+  (issue.assignee.username ?? '');
+              const username = String(rawUsername).replace('@', '').trim();
+              if (!username || username.toLowerCase() === 'unassigned') return '';
+              const fallbackId = getUserIdByUsername(username);
+              return fallbackId == null ? '' : String(fallbackId);
+          } catch {
+              return '';
+          }
+      })();
+      const canAssignToMe = !!currentUser && assigneeName.replace('@', '').trim().toLowerCase() !==
+  (currentUser ?? '').replace('@', '').trim().toLowerCase();
 
     return (
         <div
@@ -322,7 +447,7 @@ export default function IssueDetailPage() {
                         </p>
                     </div>
 
-                    {/* DESCRIPTION CARD */}
+                    {/* DESCRIPCIÓN */}
                     <div className="bg-white p-6 rounded-lg shadow-sm border border-zinc-200/60 mb-6">
                         {/* STATUS BADGE — clickable for creator, expands inline picker */}
                         <div className="mb-4" onClick={e => e.stopPropagation()}>
@@ -380,34 +505,53 @@ export default function IssueDetailPage() {
 
                         {/* ATTACHMENTS */}
                         <div className="mt-6">
-                            <h3 className="text-sm font-bold text-[#2c3e50] mb-3">
-                                {issue.attachments?.length || 0} {issue.attachments?.length === 1 ? 'Attachment' : 'Attachments'}
-                            </h3>
-                            <div className="flex flex-col gap-2">
-                                {issue.attachments?.map(att => (
-                                    <div key={att.id} className="flex justify-between items-center p-2.5 bg-zinc-50 rounded border border-zinc-200/80 text-sm">
-                                        <a href={att.file_url} target="_blank" rel="noreferrer" className="text-[#4db6ac] hover:underline font-medium">{att.name}</a>
-                                    </div>
-                                ))}
+                         <div className="mb-4 flex justify-left items-center gap-3">
+                                  <h3 className="text-lg font-bold text-[#2c3e50]">
+                                      {issue.attachments?.length || 0} {(issue.attachments?.length === 1) ?
+                                  <h3 className="text-lg font-bold text-[#2c3e50]">
+                                      {issue.attachments?.length || 0} {(issue.attachments?.length === 1) ?
+  'Attachment' : 'Attachments'}
+                                  </h3>
+                                  <button onClick={() => fileRef.current?.click()} className="flex align-center
+  justify-center w-7 h-7 font-bold bg-[#5dc5b5] text-white cursor-pointer rounded-sm">+</button>
+                                  <input ref={fileRef} type="file" onChange={handleAddAttachment} hidden></input>
+                                  <h2 className="text-sm text-[#2c3e50]">{uploading ? "Uploading..." : ""}</h2>
                             </div>
+                            {issue.attachments?.length === 0 ?
+                                ''
+                                : <div
+                                    className="flex flex-col gap-2 p-2.5 bg-zinc-50 rounded border border-zinc-200/80 text-sm">
+                                    {issue.attachments?.map(att => (
+                                        <div key={att.id} className="flex flex-row justify-between items-center">
+                                            <a href={att.url} target="_blank" rel="noreferrer"
+                                               className="text-[#4db6ac] hover:underline font-medium cursor-pointer">{att.name}</a>
+                                            {att.creator_id == getUserIdByUsername(currentUser ?? '') ?
+                                                <button onClick={() => handleDeleteAttachmentClick(att.id)}
+                                                        className="cursor-pointer w-7.75 border-2 border-red-500 text-red-500 font-bold p-1 transition duration-200 hover:bg-red-500 hover:text-white">X
+                                                </button>
+                                            : ''}
+                                        </div>
+                                    ))}
+                                </div>
+                            }
                         </div>
                     </div>
 
                     {/* COMMENTS / ACTIVITIES */}
                     <div className="bg-white p-6 rounded-lg shadow-sm border border-zinc-200/60">
                         <div className="flex gap-6 border-b border-zinc-200 mb-6">
-                            <span
+                            <button
                                 onClick={() => setActiveTab('comments')}
                                 className={`pb-2.5 cursor-pointer font-bold text-sm transition-colors ${activeTab === 'comments' ? 'text-[#4db6ac] border-b-2 border-[#4db6ac]' : 'text-zinc-400 hover:text-zinc-600'}`}
                             >
                                 {issue.comments?.length || 0} Comments
-                            </span>
-                            <span
+                            </button>
+                            <button
                                 onClick={() => setActiveTab('activities')}
                                 className={`pb-2.5 cursor-pointer font-bold text-sm transition-colors ${activeTab === 'activities' ? 'text-[#4db6ac] border-b-2 border-[#4db6ac]' : 'text-zinc-400 hover:text-zinc-600'}`}
                             >
                                 {issue.activities?.length || 0} Activities
-                            </span>
+                            </button>
                         </div>
 
                         {activeTab === 'activities' ? (
@@ -443,7 +587,7 @@ export default function IssueDetailPage() {
                                         required
                                     />
                                     <div className="text-right mt-2">
-                                        <button type="submit" className="bg-[#4db6ac] text-white px-5 py-2 rounded font-bold text-xs tracking-wider uppercase hover:bg-[#3ca398] transition-colors">
+                                        <button type="submit" className="bg-[#4db6ac] text-white px-5 py-2 rounded font-bold text-xs tracking-wider uppercase hover:bg-[#3ca398] transition-colors cursor-pointer">
                                             PUBLISH
                                         </button>
                                     </div>
@@ -469,18 +613,19 @@ export default function IssueDetailPage() {
                                                             rows={2}
                                                         />
                                                         <div className="mt-2 flex gap-3 justify-end items-center">
-                                                            <span onClick={() => setEditingCommentId(null)} className="cursor-pointer text-zinc-400 hover:text-zinc-600 text-xs font-medium">Cancelar</span>
-                                                            <button onClick={() => handleSaveCommentEdit(com.id)} className="bg-[#4db6ac] text-white px-3 py-1 rounded text-xs font-bold hover:bg-[#3ca398]">GUARDAR</button>
+                                                            <button onClick={() => { setEditingCommentId(null); }} className="cursor-pointer text-zinc-400 hover:text-zinc-600 text-xs font-medium">Cancelar</button>
+                                                            <button onClick={() => handleSaveCommentEdit(com.id)} className="cursor-pointer bg-[#4db6ac] text-white px-3 py-1 rounded text-xs font-bold hover:bg-[#3ca398]">GUARDAR</button>
                                                         </div>
                                                     </div>
                                                 ) : (
                                                     // key is on the outermost element (the parent div above), not here
                                                     <React.Fragment>
                                                         <p className="text-sm text-zinc-700 whitespace-pre-wrap">{com.body}</p>
+
                                                         {isMyComment && (
                                                             <div className="mt-3 flex gap-4 text-xs font-bold border-t border-zinc-100 pt-2">
-                                                                <span onClick={() => { setEditingCommentId(com.id); setEditingCommentBody(com.body); }} className="text-[#4db6ac] cursor-pointer hover:underline">Editar</span>
-                                                                <span onClick={() => handleDeleteCommentClick(com.id)} className="text-red-500 cursor-pointer hover:underline">Eliminar</span>
+                                                                <button onClick={() => { setEditingCommentId(com.id); setEditingCommentBody(com.body); }} className="text-[#4db6ac] cursor-pointer hover:underline">Editar</button>
+                                                                <button onClick={() => handleDeleteCommentClick(com.id)} className="text-red-500 cursor-pointer hover:underline">Eliminar</button>
                                                             </div>
                                                         )}
                                                     </React.Fragment>
@@ -588,84 +733,116 @@ export default function IssueDetailPage() {
                     {/* ASSIGNED */}
                     <div className="flex justify-between items-center py-3 border-b border-zinc-100 text-sm">
                         <span className="text-zinc-400">Assigned</span>
-                        <span className="font-semibold text-zinc-700">
-                            {issue.assignee && issue.assignee !== 'Unassigned' ? `@${issue.assignee}` : 'Unassigned'}
-                        </span>
+                        <div className="flex flex-col items-end gap-2">
+                              <select
+                                  value={currentAssigneeValue}
+                                  onChange={handleAssigneeSelectChange}
+                                  disabled={isSavingAssignee}
+                                  className="text-xs px-2 py-1.5 border border-zinc-200 rounded outline-none 
+  bg-zinc-50/50 text-zinc-700"
+                              >
+                                  <option value="">Unassigned</option>
+                                  {AUTH_USERS.map((user) => (
+                                      <option key={user.id} value={String(user.id)}>{user.username}</option>
+                                  ))}
+                              </select>
+                              <button
+                                  onClick={handleAssignToMe}
+                                  disabled={!canAssignToMe || isSavingAssignee}
+                                  className="bg-zinc-100 text-zinc-700 border border-zinc-300 hover:bg-zinc-200
+   text-xs font-bold px-2.5 py-1.5 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                  Assign to me
+                              </button>
+                              {assigneeMessage && (
+                                  <span className={`text-[11px] ${assigneeMessage.isError ? 'text-red-500' : 
+  'text-emerald-600'}`}>
+                                      {assigneeMessage.text}
+                                  </span>
+                              )}
+                          </div>
+                      </div>
+
+                      {/* TAGS */}
+                      <div className="py-3 border-b border-zinc-100 text-sm">
+                          <div className="flex justify-between items-center mb-2">
+                              <span className="text-zinc-400">Tags</span>
+                              {isCreator && (
+                                  <button
+                                      onClick={() => setOpenPicker(openPicker === 'tags' ? null : 'tags')}
+                                      className="text-xs text-[#4db6ac] hover:underline font-medium"
+                                  >
+                                      + Add tag
+                                  </button>
+                              )}
+                          </div>
+
+                          {openPicker === 'tags' && (
+                              <div className="mb-2 bg-white border border-zinc-200 rounded-lg shadow-sm 
+  overflow-hidden">
+                                  {availableTags.length === 0 ? (
+                                      <div className="px-3 py-2 text-xs text-zinc-400 text-center">All tags
+  applied</div>
+                                  ) : (
+                                      availableTags.map(tag => (
+                                          <div key={tag.id} onClick={() => handleAddTag(tag.id)}
+  className="flex items-center gap-2.5 px-3 py-2 cursor-pointer text-sm hover:bg-zinc-50 text-zinc-700">
+                                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{
+   backgroundColor: tag.color || '#cbd5e1' }} />
+                                              <span>{tag.name}</span>
+                                          </div>
+                                      ))
+                                  )}
+                                  <div className="border-t border-zinc-100">
+                                      <div onClick={() => setOpenPicker(null)} className="px-3 py-2 text-xs
+  text-zinc-400 cursor-pointer hover:text-zinc-600 text-center">Cancel</div>
+                                  </div>
+                              </div>
+                          )}
+
+                          <div className="flex flex-wrap gap-1.5">
+                              {issue.tags?.map(tag => (
+                                  <span key={tag.id} className="inline-flex items-center gap-1 px-2 py-0.5 
+  rounded-full text-xs font-medium text-white" style={{ backgroundColor: tag.color || '#4db6ac' }}>
+                                      {tag.name}
+                                      {isCreator && (
+                                          <button onClick={() => handleRemoveTag(tag.id)} className="ml-0.5
+  hover:opacity-70 leading-none text-sm" title="Remove tag">×</button>
+                                      )}
+                                  </span>
+                              ))}
+                              {(!issue.tags || issue.tags.length === 0) && (
+                                  <span className="text-zinc-400 text-xs italic">No tags</span>
+                              )}
+                          </div>
+                      </div>
+
+                      {/* WATCHERS */}
+                      <div className="mt-6 pt-4 border-t border-zinc-100">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 
+  mb-3">WATCHERS ({currentWatchers.length})</h4>
+                          <div className="flex gap-1">
+                              <select className="flex-1 text-xs px-2 py-1.5 border border-zinc-200 rounded 
+  outline-none bg-zinc-50/50 text-zinc-600">
+                                  <option>Add user...</option>
+                              </select>
+                              <button className="bg-zinc-100 text-zinc-600 border border-zinc-300 
+  hover:bg-zinc-200 text-xs font-bold px-2.5 rounded">+</button>
+                          </div>
+                      </div>
                     </div>
 
-                    {/* TAGS */}
-                    <div className="py-3 border-b border-zinc-100 text-sm">
-                        <div className="flex justify-between items-center mb-2">
-                            <span className="text-zinc-400">Tags</span>
-                            {isCreator && (
-                                <button
-                                    onClick={() => setOpenPicker(openPicker === 'tags' ? null : 'tags')}
-                                    className="text-xs text-[#4db6ac] hover:underline font-medium"
-                                >
-                                    + Add tag
-                                </button>
-                            )}
+                    {/* EL BOTÓN SOLO SE RENDERIZA SI EL USUARIO LOGUEADO ES EL CREADOR */}
+                    {isMyIssue && (
+                        <div className="mt-8">
+                            <button
+                                onClick={handleDeleteIssueClick}
+                                className="w-full py-2.5 bg-white text-red-500 border border-red-500 rounded font-bold text-xs tracking-wider uppercase transition-all hover:bg-red-500 hover:text-white cursor-pointer"
+                            >
+                                DELETE ISSUE
+                            </button>
                         </div>
-
-                        {/* Inline tag picker */}
-                        {openPicker === 'tags' && (
-                            <div className="mb-2 bg-white border border-zinc-200 rounded-lg shadow-sm overflow-hidden">
-                                {availableTags.length === 0 ? (
-                                    <div className="px-3 py-2 text-xs text-zinc-400 text-center">All tags applied</div>
-                                ) : (
-                                    availableTags.map(tag => (
-                                        <div
-                                            key={tag.id}
-                                            onClick={() => handleAddTag(tag.id)}
-                                            className="flex items-center gap-2.5 px-3 py-2 cursor-pointer text-sm hover:bg-zinc-50 text-zinc-700"
-                                        >
-                                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#cbd5e1' }} />
-                                            <span>{tag.name}</span>
-                                        </div>
-                                    ))
-                                )}
-                                <div className="border-t border-zinc-100">
-                                    <div
-                                        onClick={() => setOpenPicker(null)}
-                                        className="px-3 py-2 text-xs text-zinc-400 cursor-pointer hover:text-zinc-600 text-center"
-                                    >
-                                        Cancel
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="flex flex-wrap gap-1.5">
-                            {issue.tags?.map(tag => (
-                                <span
-                                    key={tag.id}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
-                                    style={{ backgroundColor: tag.color || '#4db6ac' }}
-                                >
-                                    {tag.name}
-                                    {isCreator && (
-                                        <button
-                                            onClick={() => handleRemoveTag(tag.id)}
-                                            className="ml-0.5 hover:opacity-70 leading-none text-sm"
-                                            title="Remove tag"
-                                        >×</button>
-                                    )}
-                                </span>
-                            ))}
-                            {(!issue.tags || issue.tags.length === 0) && (
-                                <span className="text-zinc-400 text-xs italic">No tags</span>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="mt-8">
-                        <button
-                            onClick={handleDeleteIssueClick}
-                            className="w-full py-2.5 bg-white text-red-500 border border-red-500 rounded font-bold text-xs tracking-wider uppercase transition-all hover:bg-red-500 hover:text-white cursor-pointer"
-                        >
-                            DELETE ISSUE
-                        </button>
-                    </div>
+                    )}
                 </div>
 
             </div>
