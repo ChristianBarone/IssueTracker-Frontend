@@ -821,12 +821,12 @@ export default function IssueDetailPage() {
                                     <span className="text-zinc-400">{attr.label}</span>
                                     <button
                                         onClick={() => isCreator && setOpenPicker(isOpen ? null : attr.key)}
-                                        className={`font-semibold text-zinc-700 flex items-center gap-2 ${isCreator ? 'cursor-pointer hover:text-[#4db6ac] group' : ''}`}
+                                        className={`font-semibold text-zinc-700 flex items-center gap-2 ${isCreator ? 'cursor-pointer hover:text-[#4db6ac] group' : 'cursor-default'}`}
                                     >
-                                        <span
-                                            className="w-2 h-2 rounded-full inline-block shrink-0"
-                                            style={{ backgroundColor: currentColor }}
-                                        />
+                        <span
+                            className="w-2 h-2 rounded-full inline-block shrink-0"
+                            style={{ backgroundColor: currentColor }}
+                        />
                                         {attr.currentName || 'None'}
                                         {isCreator && (
                                             <span className="text-zinc-300 group-hover:text-zinc-500 text-xs transition-colors">✎</span>
@@ -858,12 +858,12 @@ export default function IssueDetailPage() {
                                     value={deadlineInput}
                                     onChange={e => setDeadlineInput(e.target.value)}
                                     autoFocus
-                                    className="w-full bg-white border border-zinc-300 rounded px-2 py-1.5 text-sm outline-none focus:border-[#4db6ac]"
+                                    className="w-full bg-white border border-zinc-300 rounded px-2 py-1.5 text-sm outline-none focus:border-[#4db6ac] cursor-pointer"
                                 />
                                 <div className="flex gap-1.5 justify-end">
-                                    <button onClick={() => handleSaveDeadline(null)} className="text-zinc-400 hover:text-red-400 px-2 py-1 rounded text-xs font-medium">Clear date</button>
-                                    <button onClick={() => setIsEditingDeadline(false)} className="bg-zinc-200 text-zinc-600 px-2 py-1 rounded text-xs hover:bg-zinc-300">Cancel</button>
-                                    <button onClick={() => handleSaveDeadline(deadlineInput || null)} className="bg-[#4db6ac] text-white px-2 py-1 rounded text-xs font-bold hover:bg-[#3ca398]">Save</button>
+                                    <button type="button" onClick={() => handleSaveDeadline(null)} className="text-zinc-400 hover:text-red-400 px-2 py-1 rounded text-xs font-medium cursor-pointer">Clear date</button>
+                                    <button type="button" onClick={() => setIsEditingDeadline(false)} className="bg-zinc-200 text-zinc-600 px-2 py-1 rounded text-xs hover:bg-zinc-300 cursor-pointer">Cancel</button>
+                                    <button type="button" onClick={() => handleSaveDeadline(deadlineInput || null)} className="bg-[#4db6ac] text-white px-2 py-1 rounded text-xs font-bold hover:bg-[#3ca398] cursor-pointer">Save</button>
                                 </div>
                             </div>
                         ) : (
@@ -875,7 +875,7 @@ export default function IssueDetailPage() {
                                         setDeadlineInput(issue.deadline ? new Date(issue.deadline).toISOString().split('T')[0] : '');
                                         setIsEditingDeadline(true);
                                     }}
-                                    className={`font-semibold text-zinc-700 flex items-center gap-1.5 ${isCreator ? 'cursor-pointer hover:text-[#4db6ac] group' : ''}`}
+                                    className={`font-semibold text-zinc-700 flex items-center gap-1.5 ${isCreator ? 'cursor-pointer hover:text-[#4db6ac] group' : 'cursor-default'}`}
                                 >
                                     {issue.deadline ? new Date(issue.deadline).toLocaleDateString('en-GB') : 'No date'}
                                     {isCreator && <span className="text-zinc-300 group-hover:text-zinc-500 text-xs transition-colors">✎</span>}
@@ -889,7 +889,7 @@ export default function IssueDetailPage() {
                         <span className="text-zinc-400">Creator</span>
                         <Link
                             href={getProfileHref(creatorName)}
-                            className="font-bold text-zinc-700 hover:text-[#4db6ac] hover:underline"
+                            className="font-bold text-zinc-700 hover:text-[#4db6ac] hover:underline cursor-pointer"
                         >
                             @{creatorName.replace('@', '')}
                         </Link>
@@ -903,7 +903,7 @@ export default function IssueDetailPage() {
                                 value={currentAssigneeValue}
                                 onChange={handleAssigneeSelectChange}
                                 disabled={isSavingAssignee}
-                                className="text-xs px-2 py-1.5 border border-zinc-200 rounded outline-none bg-zinc-50/50 text-zinc-700"
+                                className="text-xs px-2 py-1.5 border border-zinc-200 rounded outline-none bg-zinc-50/50 text-zinc-700 cursor-pointer disabled:cursor-not-allowed"
                             >
                                 <option value="">Unassigned</option>
                                 {AUTH_USERS.map((user) => (
@@ -911,16 +911,17 @@ export default function IssueDetailPage() {
                                 ))}
                             </select>
                             <button
+                                type="button"
                                 onClick={handleAssignToMe}
                                 disabled={!canAssignToMe || isSavingAssignee}
-                                className="bg-zinc-100 text-zinc-700 border border-zinc-300 hover:bg-zinc-200 text-xs font-bold px-2.5 py-1.5 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="bg-zinc-100 text-zinc-700 border border-zinc-300 hover:bg-zinc-200 text-xs font-bold px-2.5 py-1.5 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Assign to me
                             </button>
                             {assigneeMessage && (
                                 <span className={`text-[11px] ${assigneeMessage.isError ? 'text-red-500' : 'text-emerald-600'}`}>
-                                    {assigneeMessage.text}
-                                </span>
+                    {assigneeMessage.text}
+                </span>
                             )}
                         </div>
                     </div>
@@ -931,8 +932,9 @@ export default function IssueDetailPage() {
                             <span className="text-zinc-400">Tags</span>
                             {isCreator && (
                                 <button
+                                    type="button"
                                     onClick={() => setOpenPicker(openPicker === 'tags' ? null : 'tags')}
-                                    className="text-xs text-[#4db6ac] hover:underline font-medium"
+                                    className="text-xs text-[#4db6ac] hover:underline font-medium cursor-pointer"
                                 >
                                     + Add tag
                                 </button>
@@ -973,21 +975,24 @@ export default function IssueDetailPage() {
                                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
                                     style={{ backgroundColor: tag.color || '#888' }}
                                 >
-                                    {tag.name}
+                    {tag.name}
                                     {isCreator && (
                                         <button
+                                            type="button"
                                             onClick={() => handleRemoveTag(tag.id)}
-                                            className="ml-0.5 hover:opacity-70 leading-none text-sm"
+                                            className="ml-0.5 hover:opacity-70 leading-none text-sm cursor-pointer"
                                             title="Remove tag"
                                         >×</button>
                                     )}
-                                </span>
+                </span>
                             ))}
                             {enrichedTags.length === 0 && (
                                 <span className="text-zinc-400 text-xs italic">No tags</span>
                             )}
                         </div>
                     </div>
+
+                    {/* WATCHERS */}
                     <div className="mt-4 border-b border-zinc-100 pb-4">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3">
                             WATCHERS ({issue.watchers?.length || 0})
@@ -996,7 +1001,6 @@ export default function IssueDetailPage() {
                         {/* Lista de watchers actuales */}
                         <ul className="mb-4 flex flex-col gap-2">
                             {issue.watchers?.map((watcher: string) => {
-                                // Como ya vienen normalizados del servicio, 'watcher' siempre tendrá id y username válidos
                                 return (
                                     <li key={`${watcher}`} className="flex justify-between items-center text-sm bg-zinc-50 p-2 rounded border border-zinc-100">
                                         <div className="flex items-center gap-2">
@@ -1013,13 +1017,14 @@ export default function IssueDetailPage() {
                                 );
                             })}
                         </ul>
+
                         {/* Formulario selector */}
                         <form onSubmit={handleAddWatcherSubmit} className="flex gap-1">
                             <select
                                 name="user_id"
                                 value={selectedUserId}
                                 onChange={(e) => setSelectedUserId(e.target.value)}
-                                className="flex-1 bg-white border border-zinc-200 rounded text-xs p-2 outline-none focus:border-zinc-400 text-zinc-600"
+                                className="flex-1 bg-white border border-zinc-200 rounded text-xs p-2 outline-none focus:border-zinc-400 text-zinc-600 cursor-pointer"
                             >
                                 <option value="">Add user...</option>
                                 {availableUsers.map((user) => (
@@ -1030,7 +1035,7 @@ export default function IssueDetailPage() {
                             </select>
                             <button
                                 type="submit"
-                                className="bg-zinc-100 text-zinc-700 border border-zinc-200 px-3 py-1.5 rounded text-sm font-bold hover:bg-zinc-200 active:bg-zinc-300 transition-colors"
+                                className="bg-zinc-100 text-zinc-700 border border-zinc-200 px-3 py-1.5 rounded text-sm font-bold hover:bg-zinc-200 active:bg-zinc-300 transition-colors cursor-pointer"
                             >
                                 +
                             </button>
@@ -1040,6 +1045,7 @@ export default function IssueDetailPage() {
                     {isMyIssue && (
                         <div className="mt-8">
                             <button
+                                type="button"
                                 onClick={handleDeleteIssueClick}
                                 className="w-full py-2.5 bg-white text-red-500 border border-red-500 rounded font-bold text-xs tracking-wider uppercase transition-all hover:bg-red-500 hover:text-white cursor-pointer"
                             >

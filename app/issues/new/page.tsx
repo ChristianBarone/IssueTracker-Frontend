@@ -4,7 +4,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AUTH_USERS, getStoredApiKey, getStoredUsername, getUserIdByUsername } from '../../lib/auth';
 import { fetchEntities } from '../../settings/settingsService';
-import {createIssue} from "@/app/issues/issueService";
+import { createIssue } from "@/app/issues/issueService";
 
 export default function CreateIssuePage() {
     const router = useRouter();
@@ -75,7 +75,7 @@ export default function CreateIssuePage() {
         }
     };
 
-    const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setLoading(true);
         setStatusMessage(null);
@@ -169,7 +169,8 @@ export default function CreateIssuePage() {
                                 placeholder="Subject"
                                 className="w-full px-4 py-3 rounded border border-[#a3dbc5] bg-white text-base outline-none focus:border-[#4db6ac] transition-colors"
                             />
-                            <button type="button" className="text-left text-[13px] text-[#4db6ac] hover:underline mt-1 font-medium">
+                            {/* MODIFICADO: Agregado cursor-pointer */}
+                            <button type="button" className="text-left text-[13px] text-[#4db6ac] hover:underline mt-1 font-medium cursor-pointer">
                                 Add tag +
                             </button>
                         </div>
@@ -220,7 +221,7 @@ export default function CreateIssuePage() {
                                     name="assigned_to"
                                     value={formData.assigned_to}
                                     onChange={handleChange}
-                                    className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
+                                    className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700 cursor-pointer" // ◄ MODIFICADO: cursor-pointer
                                 >
                                     <option value="">Unassigned</option>
                                     {AUTH_USERS.map((user) => (
@@ -234,7 +235,7 @@ export default function CreateIssuePage() {
                                         assigned_to: currentUserId == null ? '' : String(currentUserId)
                                     }))}
                                     disabled={currentUserId == null}
-                                    className="w-fit whitespace-nowrap border border-zinc-300 bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-700 rounded hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-fit whitespace-nowrap border border-zinc-300 bg-zinc-100 px-3 py-2 text-xs font-bold text-zinc-700 rounded hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer" // ◄ MODIFICADO: cursor-pointer
                                 >
                                     Assign to me
                                 </button>
@@ -247,7 +248,7 @@ export default function CreateIssuePage() {
                                 name="issue_type"
                                 value={formData.issue_type}
                                 onChange={handleChange}
-                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
+                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700 cursor-pointer" // ◄ MODIFICADO: cursor-pointer
                             >
                                 {types.length > 0 ? (
                                     types.map((type) => (
@@ -265,7 +266,7 @@ export default function CreateIssuePage() {
                                 name="issue_severity"
                                 value={formData.issue_severity}
                                 onChange={handleChange}
-                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
+                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700 cursor-pointer" // ◄ MODIFICADO: cursor-pointer
                             >
                                 {severities.length > 0 ? (
                                     severities.map((severity) => (
@@ -283,7 +284,7 @@ export default function CreateIssuePage() {
                                 name="priority"
                                 value={formData.priority}
                                 onChange={handleChange}
-                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
+                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700 cursor-pointer" // ◄ MODIFICADO: cursor-pointer
                             >
                                 {priorities.length > 0 ? (
                                     priorities.map((priority) => (
@@ -302,7 +303,7 @@ export default function CreateIssuePage() {
                                 name="deadline"
                                 value={formData.deadline}
                                 onChange={handleChange}
-                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-600 font-mono"
+                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-600 font-mono cursor-pointer" // ◄ MODIFICADO: cursor-pointer
                             />
                         </div>
 
