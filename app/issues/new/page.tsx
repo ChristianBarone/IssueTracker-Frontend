@@ -205,7 +205,7 @@ export default function CreateIssuePage() {
                             >
                                 {statuses.length > 0 ? (
                                     statuses.map((status) => (
-                                        <option key={status.name} value={status.name}>{status.name}</option>
+                                        <option className="cursor-pointer" key={status.name} value={status.name}>{status.name}</option>
                                     ))
                                 ) : (
                                     <option value="">Loading...</option>
@@ -220,7 +220,7 @@ export default function CreateIssuePage() {
                                     name="assigned_to"
                                     value={formData.assigned_to}
                                     onChange={handleChange}
-                                    className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
+                                    className="cursor-pointer bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
                                 >
                                     <option value="">Unassigned</option>
                                     {AUTH_USERS.map((user) => (
@@ -247,7 +247,7 @@ export default function CreateIssuePage() {
                                 name="issue_type"
                                 value={formData.issue_type}
                                 onChange={handleChange}
-                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
+                                className="cursor-pointer w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
                             >
                                 {types.length > 0 ? (
                                     types.map((type) => (
@@ -265,7 +265,7 @@ export default function CreateIssuePage() {
                                 name="issue_severity"
                                 value={formData.issue_severity}
                                 onChange={handleChange}
-                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
+                                className="cursor-pointer w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
                             >
                                 {severities.length > 0 ? (
                                     severities.map((severity) => (
@@ -283,7 +283,7 @@ export default function CreateIssuePage() {
                                 name="priority"
                                 value={formData.priority}
                                 onChange={handleChange}
-                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
+                                className="cursor-pointer w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
                             >
                                 {priorities.length > 0 ? (
                                     priorities.map((priority) => (
@@ -296,13 +296,13 @@ export default function CreateIssuePage() {
                         </div>
 
                         <div className="flex flex-col gap-1">
-                            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Deadline</label>
+                            <label className="cursor-pointer text-[11px] font-bold uppercase tracking-wider text-zinc-400">Deadline</label>
                             <input
                                 type="date"
                                 name="deadline"
                                 value={formData.deadline}
                                 onChange={handleChange}
-                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-600 font-mono"
+                                className="cursor-pointer w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-600 font-mono"
                             />
                         </div>
 

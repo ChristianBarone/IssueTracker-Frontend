@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import React, {useState, useEffect, useRef, useMemo} from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -12,8 +11,7 @@ import {
 import { IssueDetailData } from './types';
 import { AUTH_USERS, getStoredUsername, getStoredApiKey, getUserIdByUsername, getUserById } from '../../lib/auth';
 import { fetchEntities, AnyEntity } from '../../settings/settingsService';
-import { fetchProfile } from '../../profile/profileService';
-import {AssigneeDropdown} from "@/app/components/Assignee-Dropdown";
+import {AssigneeDropdown} from "@/app/components/Dropdown";
 
 export default function IssueDetailPage() {
     const { id } = useParams();
@@ -51,7 +49,6 @@ export default function IssueDetailPage() {
     const [priorities, setPriorities] = useState<AnyEntity[]>([]);
     const [statuses, setStatuses] = useState<AnyEntity[]>([]);
     const [allTags, setAllTags] = useState<AnyEntity[]>([]);
-    const [userAvatars, setUserAvatars] = useState<Record<string, string | null>>({});
 
     const [openPicker, setOpenPicker] = useState<string | null>(null);
 
@@ -230,8 +227,11 @@ export default function IssueDetailPage() {
         if (!userToAdd) return;
         const success = await addWatcher(issueId, idToNumber);
         if (success) {
+            setIssue({
+                ...issue,
+                watchers: [...issue.watchers, userToAdd]
+            });
             setSelectedUserId('');
-            await loadData();
             setAvailableUsers(availableUsers.filter((user) => user.username !== userToAdd))
         } else {
             alert("No se ha podido añadir al watcher.");
@@ -332,37 +332,6 @@ export default function IssueDetailPage() {
         return `${weeks} week${weeks > 1 ? 's' : ''}, ${remainingDays} day${remainingDays === 1 ? '' : 's'} ago`;
     };
 
-    const normalizeUsername = (value: string) => value.replace('@', '').trim();
-
-    const getProfileHref = (value: string) => `/profile/${encodeURIComponent(normalizeUsername(value))}`;
-
-    const getUserAvatar = (value: string) => userAvatars[normalizeUsername(value)] ?? null;
-
-    const UserAvatar = ({ username, size = 28 }: { username: string; size?: number }) => {
-        const avatarUrl = getUserAvatar(username);
-        const initials = normalizeUsername(username).slice(0, 2).toUpperCase() || 'U';
-
-        return (
-            <div
-                className="relative flex-shrink-0 overflow-hidden rounded-full bg-zinc-500 text-white flex items-center justify-center font-bold uppercase"
-                style={{ width: size, height: size }}
-            >
-                {avatarUrl ? (
-                    <Image
-                        src={avatarUrl}
-                        alt={`Avatar of ${normalizeUsername(username)}`}
-                        fill
-                        unoptimized
-                        sizes={`${size}px`}
-                        className="object-cover"
-                    />
-                ) : (
-                    <span className="text-[10px] leading-none">{initials}</span>
-                )}
-            </div>
-        );
-    };
-
     const getActivityLabel = (fieldName: string | undefined | null, oldValue: string | null, newValue: string | null) => {
         const field = String(fieldName ?? '').toLowerCase();
         if (!field) return 'updated this issue';
@@ -411,59 +380,6 @@ export default function IssueDetailPage() {
     const getActivityNewValue = (activity: { new_value?: string | null; new?: string | null }) => {
         return activity.new_value ?? activity.new ?? null;
     };
-
-    useEffect(() => {
-        if (!issue) return;
-
-        const apiKey = getStoredApiKey();
-        if (!apiKey) return;
-
-        const usernames = new Set<string>();
-
-        issue.comments.forEach((comment) => {
-            const author = normalizeUsername(comment.author);
-            if (author) usernames.add(author);
-        });
-
-        issue.activities.forEach((activity) => {
-            const actor = normalizeUsername(getActivityUser(activity));
-            if (actor && actor.toLowerCase() !== 'system') usernames.add(actor);
-        });
-
-        const missingUsernames = Array.from(usernames).filter((username) => userAvatars[username] === undefined);
-        if (missingUsernames.length === 0) return;
-
-        let cancelled = false;
-
-        const loadAvatars = async () => {
-            const results = await Promise.all(
-                missingUsernames.map(async (username) => {
-                    try {
-                        const profile = await fetchProfile(username, apiKey);
-                        return [username, profile.avatar ?? null] as const;
-                    } catch {
-                        return [username, null] as const;
-                    }
-                })
-            );
-
-            if (cancelled) return;
-
-            setUserAvatars((prev) => {
-                const next = { ...prev };
-                results.forEach(([username, avatarUrl]) => {
-                    next[username] = avatarUrl;
-                });
-                return next;
-            });
-        };
-
-        void loadAvatars();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [issue, userAvatars]);
 
     if (loading) return <div className="p-10 text-center text-zinc-400 font-medium">Loading issue data...</div>;
     if (!issue) return (
@@ -666,7 +582,7 @@ export default function IssueDetailPage() {
                                 <h3 className="text-lg font-bold text-[#2c3e50]">
                                     {issue.attachments?.length || 0} {(issue.attachments?.length === 1) ? 'Attachment' : 'Attachments'}
                                 </h3>
-                                <button onClick={() => fileRef.current?.click()} className="flex align-center justify-center w-7 h-7 font-bold bg-[#5dc5b5] text-white cursor-pointer rounded-sm">+</button>
+                                <button onClick={() => fileRef.current?.click()} className="flex align-center justify-center items-center w-7 h-7 font-bold bg-[#5dc5b5] text-white cursor-pointer rounded-sm">+</button>
                                 <input ref={fileRef} type="file" onChange={handleAddAttachment} hidden></input>
                                 <h2 className="text-sm text-[#2c3e50]">{uploading ? 'Uploading...' : ''}</h2>
                             </div>
@@ -696,13 +612,13 @@ export default function IssueDetailPage() {
                                 onClick={() => setActiveTab('comments')}
                                 className={`pb-2.5 cursor-pointer font-bold text-sm transition-colors ${activeTab === 'comments' ? 'text-[#4db6ac] border-b-2 border-[#4db6ac]' : 'text-zinc-400 hover:text-zinc-600'}`}
                             >
-                                {issue.comments?.length || 0} Comments
+                                {issue.comments?.length || 0} {issue.comments?.length === 1 ? 'Comment' : 'Comments'}
                             </button>
                             <button
                                 onClick={() => setActiveTab('activities')}
                                 className={`pb-2.5 cursor-pointer font-bold text-sm transition-colors ${activeTab === 'activities' ? 'text-[#4db6ac] border-b-2 border-[#4db6ac]' : 'text-zinc-400 hover:text-zinc-600'}`}
                             >
-                                {issue.activities?.length || 0} Activities
+                                {issue.activities?.length || 0} {issue.activities?.length === 1 ? 'Activity' : 'Activities'}
                             </button>
                         </div>
 
@@ -710,20 +626,12 @@ export default function IssueDetailPage() {
                             <div className="flex flex-col gap-4">
                                 {issue.activities?.map(act => (
                                     <div key={act.id} className="flex gap-3 text-sm">
-                                        <UserAvatar username={getActivityUser(act)} />
+                                        <div className="w-7 h-7 rounded-full bg-zinc-500 text-white flex items-center justify-center font-bold text-xs uppercase shrink-0">
+                                            {act.user ? act.user.slice(0, 1) : 'U'}
+                                        </div>
                                         <div>
                                             <div className="text-zinc-800">
-                                                {act.user ? (
-                                                    <Link
-                                                        href={getProfileHref(act.user)}
-                                                        className="font-bold text-[#4db6ac] hover:underline"
-                                                    >
-                                                        {act.user}
-                                                    </Link>
-                                                ) : (
-                                                    <strong>System</strong>
-                                                )}{' '}
-                                                {getActivityLabel(act.field, act.old, act.new)}
+                                                <strong>{act.user || 'System'}</strong> {getActivityLabel(act.field, act.old, act.new)}
                                             </div>
                                             <div className="text-xs text-zinc-400 mt-0.5">
                                                 {act.old || '-'} → {act.new || '-'}
@@ -760,41 +668,34 @@ export default function IssueDetailPage() {
                                         const isMyComment = cleanAuthor === cleanCommentUser;
                                         return (
                                             <div key={com.id} className="p-4 border border-zinc-100 rounded-md bg-zinc-50/30">
-                                                <div className="flex items-start gap-3">
-                                                    <UserAvatar username={com.author} size={30} />
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="flex items-center gap-2 text-xs mb-2">
-                                                            <Link href={getProfileHref(com.author)} className="text-[#4db6ac] font-bold hover:underline">
-                                                                @{com.author?.replace('@', '')}
-                                                            </Link>
-                                                            <span className="text-zinc-400">{getRelativeTimeString(com.created_at)}</span>
-                                                        </div>
-                                                        {editingCommentId === com.id ? (
-                                                            <div>
-                                                                <textarea
-                                                                    value={editingCommentBody}
-                                                                    onChange={e => setEditingCommentBody(e.target.value)}
-                                                                    className="w-full p-2 border border-zinc-300 rounded text-sm outline-none focus:border-zinc-400"
-                                                                    rows={2}
-                                                                />
-                                                                <div className="mt-2 flex gap-3 justify-end items-center">
-                                                                    <button onClick={() => { setEditingCommentId(null); }} className="cursor-pointer text-zinc-400 hover:text-zinc-600 text-xs font-medium">Cancelar</button>
-                                                                    <button onClick={() => handleSaveCommentEdit(com.id)} className="cursor-pointer bg-[#4db6ac] text-white px-3 py-1 rounded text-xs font-bold hover:bg-[#3ca398]">GUARDAR</button>
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <React.Fragment>
-                                                                <p className="text-sm text-zinc-700 whitespace-pre-wrap">{com.body}</p>
-                                                                {isMyComment && (
-                                                                    <div className="mt-3 flex gap-4 text-xs font-bold border-t border-zinc-100 pt-2">
-                                                                        <button onClick={() => { setEditingCommentId(com.id); setEditingCommentBody(com.body); }} className="text-[#4db6ac] cursor-pointer hover:underline">Editar</button>
-                                                                        <button onClick={() => handleDeleteCommentClick(com.id)} className="text-red-500 cursor-pointer hover:underline">Eliminar</button>
-                                                                    </div>
-                                                                )}
-                                                            </React.Fragment>
-                                                        )}
-                                                    </div>
+                                                <div className="flex items-center gap-2 text-xs mb-2">
+                                                    <span className="text-[#4db6ac] font-bold">@{com.author?.replace('@', '')}</span>
+                                                    <span className="text-zinc-400">{getRelativeTimeString(com.created_at)}</span>
                                                 </div>
+                                                {editingCommentId === com.id ? (
+                                                    <div>
+                                                        <textarea
+                                                            value={editingCommentBody}
+                                                            onChange={e => setEditingCommentBody(e.target.value)}
+                                                            className="w-full p-2 border border-zinc-300 rounded text-sm outline-none focus:border-zinc-400"
+                                                            rows={2}
+                                                        />
+                                                        <div className="mt-2 flex gap-3 justify-end items-center">
+                                                            <button onClick={() => { setEditingCommentId(null); }} className="cursor-pointer text-zinc-400 hover:text-zinc-600 text-xs font-medium">Cancelar</button>
+                                                            <button onClick={() => handleSaveCommentEdit(com.id)} className="cursor-pointer bg-[#4db6ac] text-white px-3 py-1 rounded text-xs font-bold hover:bg-[#3ca398]">GUARDAR</button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <React.Fragment>
+                                                        <p className="text-sm text-zinc-700 whitespace-pre-wrap">{com.body}</p>
+                                                        {isMyComment && (
+                                                            <div className="mt-3 flex gap-4 text-xs font-bold border-t border-zinc-100 pt-2">
+                                                                <button onClick={() => { setEditingCommentId(com.id); setEditingCommentBody(com.body); }} className="text-[#4db6ac] cursor-pointer hover:underline">Editar</button>
+                                                                <button onClick={() => handleDeleteCommentClick(com.id)} className="text-red-500 cursor-pointer hover:underline">Eliminar</button>
+                                                            </div>
+                                                        )}
+                                                    </React.Fragment>
+                                                )}
                                             </div>
                                         );
                                     })}
@@ -888,12 +789,9 @@ export default function IssueDetailPage() {
                     {/* CREATOR */}
                     <div className="flex justify-between items-center py-3 border-b border-zinc-100 text-sm">
                         <span className="text-zinc-400">Creator</span>
-                        <Link
-                            href={getProfileHref(creatorName)}
-                            className="font-bold text-zinc-700 hover:text-[#4db6ac] hover:underline"
-                        >
+                        <span className="font-bold text-zinc-700">
                             @{creatorName.replace('@', '')}
-                        </Link>
+                        </span>
                     </div>
 
                     {/* ASSIGNEE */}
@@ -1015,18 +913,18 @@ export default function IssueDetailPage() {
                                 name="user_id"
                                 value={selectedUserId}
                                 onChange={(e) => setSelectedUserId(e.target.value)}
-                                className="flex-1 bg-white border border-zinc-200 rounded text-xs p-2 outline-none focus:border-zinc-400 text-zinc-600"
+                                className="cursor-pointer flex-1 bg-white border border-zinc-200 rounded text-xs p-2 outline-none focus:border-zinc-400 text-zinc-600"
                             >
                                 <option value="">Add user...</option>
                                 {availableUsers.map((user) => (
-                                    <option key={user.id} value={user.id}>
+                                    <option key={user.id} value={user.id} className="cursor-pointer">
                                         {user.username}
                                     </option>
                                 ))}
                             </select>
                             <button
                                 type="submit"
-                                className="bg-zinc-100 text-zinc-700 border border-zinc-200 px-3 py-1.5 rounded text-sm font-bold hover:bg-zinc-200 active:bg-zinc-300 transition-colors"
+                                className="cursor-pointer bg-zinc-100 text-zinc-700 border border-zinc-200 px-3 py-1.5 rounded text-sm font-bold hover:bg-zinc-200 active:bg-zinc-300 transition-colors"
                             >
                                 +
                             </button>

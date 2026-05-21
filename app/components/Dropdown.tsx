@@ -34,9 +34,9 @@ export const AssigneeDropdown = ({ value, onChange, disabled, users }: { value: 
                 ref={buttonRef}
                 type="button"
                 onClick={() => !disabled && setOpen(o => !o)}
-                className={`w-40 text-left font-sans text-xs px-2 py-1.5 border border-zinc-200 rounded outline-none bg-zinc-50/50 text-zinc-700 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                className={`flex justify-between items-stretch w-40 text-left font-sans text-xs px-2 py-1.5 border border-zinc-200 rounded outline-none bg-zinc-50/50 text-zinc-700 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             >
-                {currentLabel}
+                <span>{currentLabel}</span>
             </button>
 
             {open && (
