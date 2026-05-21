@@ -1,6 +1,6 @@
 'use client';
 
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useState, useEffect, useRef, useMemo} from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -113,6 +113,17 @@ export default function IssueDetailPage() {
         return match?.color ?? '#cbd5e1';
     };
 
+    // Enrich issue tags: look up by id first, then by name as fallback (API may return id=0)
+    const enrichedTags = useMemo(() => {
+        if (!issue) return [];
+        return issue.tags.map(tag => {
+            if (tag.id > 0 && tag.name && tag.color) return tag;
+            const found = (tag.id > 0 ? allTags.find(t => t.id === tag.id) : undefined)
+                       ?? (tag.name ? allTags.find(t => t.name === tag.name) : undefined);
+            return found ? { id: found.id, name: found.name, color: found.color } : tag;
+        });
+    }, [issue, allTags]);
+
     const handleSaveSubject = async () => {
         if (!subjectInput.trim()) {
             setSubjectError('Subject cannot be empty');
@@ -152,16 +163,22 @@ export default function IssueDetailPage() {
 
     const handleRemoveTag = async (tagId: number) => {
         if (!issue) return;
-        const newTagIds = issue.tags.filter(t => t.id !== tagId).map(t => t.id);
+        const newTagIds = enrichedTags
+            .filter(t => t.id !== tagId)
+            .map(t => t.id)
+            .filter((id): id is number => id > 0);
         const success = await updateIssueFields(issueId, { tags: newTagIds });
         if (success) loadData();
     };
 
     const handleAddTag = async (tagId: number) => {
         if (!issue) return;
-        const currentIds = issue.tags.map(t => t.id);
+        const currentIds = enrichedTags
+            .map(t => t.id)
+            .filter((id): id is number => typeof id === 'number' && id > 0);
         if (currentIds.includes(tagId)) return;
-        const success = await updateIssueFields(issueId, { tags: [...currentIds, tagId] });
+        const payload = [...currentIds, tagId];
+        const success = await updateIssueFields(issueId, { tags: payload });
         if (success) {
             setOpenPicker(null);
             loadData();
@@ -390,12 +407,12 @@ export default function IssueDetailPage() {
 
     const sideAttrs = [
         { label: 'Type',     key: 'type',     fieldKey: 'issue_type', currentName: issue.type,     options: types },
-        { label: 'Severity', key: 'severity', fieldKey: 'severity',   currentName: issue.severity, options: severities },
+        { label: 'Severity', key: 'severity', fieldKey: 'issue_severity', currentName: issue.severity, options: severities },
         { label: 'Priority', key: 'priority', fieldKey: 'priority',   currentName: issue.priority, options: priorities },
     ];
 
     const statusColor = findColor(statuses, issue.status);
-    const availableTags = allTags.filter(t => !issue.tags.some(it => it.id === t.id));
+    const availableTags = allTags.filter(t => !enrichedTags.some(it => it.id === t.id));
 
     const InlineOptionsList = ({
         options,
@@ -848,11 +865,11 @@ export default function IssueDetailPage() {
                         )}
 
                         <div className="flex flex-wrap gap-1.5">
-                            {issue.tags?.map(tag => (
+                            {enrichedTags.map(tag => (
                                 <span
                                     key={tag.id}
                                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
-                                    style={{ backgroundColor: tag.color || '#4db6ac' }}
+                                    style={{ backgroundColor: tag.color || '#888' }}
                                 >
                                     {tag.name}
                                     {isCreator && (
@@ -864,7 +881,7 @@ export default function IssueDetailPage() {
                                     )}
                                 </span>
                             ))}
-                            {(!issue.tags || issue.tags.length === 0) && (
+                            {enrichedTags.length === 0 && (
                                 <span className="text-zinc-400 text-xs italic">No tags</span>
                             )}
                         </div>
