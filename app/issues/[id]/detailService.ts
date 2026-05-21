@@ -1,7 +1,7 @@
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
 import { getStoredApiKey } from '../../lib/auth';
 import { getApiBaseUrl } from '../../lib/apiBaseUrl';
-import { IssueDetailData, IssueField } from './types';
+import { IssueDetailData } from './types';
 import { getUserById, getUserByUsername } from '../../lib/auth';
 
 const baseUrl = getApiBaseUrl();
@@ -25,67 +25,54 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
         // Debug: log raw backend response for assignee to help diagnose UI mismatch
         try { console.debug('[fetchIssueDetail] raw assignee:', raw.assignee || raw.assigned_to); } catch {};
 
-        // Normalize common backend variations so the UI has consistent shapes
-        const normalizeUser = (u: unknown) => {
-            if (!u) return null;
-            if (typeof u === 'number') {
-                const knownUser = getUserById(u);
-                return knownUser ? { id: knownUser.id, username: knownUser.username } : null;
-            }
-            if (typeof u === 'string') {
-                const username = u.replace('@', '');
-                const knownUser = getUserByUsername(username);
-                return knownUser ? { id: knownUser.id, username: knownUser.username } : { id: 0, username };
-            }
+        // Normalize user fields to plain username strings
+        const normalizeUser = (u: unknown): string => {
+            if (!u) return '';
+            if (typeof u === 'number') return getUserById(u)?.username ?? '';
+            if (typeof u === 'string') return u.replace('@', '').trim();
             if (typeof u === 'object' && u !== null && 'username' in u) {
-                const username = String((u as { username: unknown }).username).replace('@', '');
-                const rawId = 'id' in u ? Number((u as { id?: unknown }).id) : 0;
-                const knownUser = getUserByUsername(username);
-                return {
-                    id: Number.isFinite(rawId) && rawId > 0 ? rawId : (knownUser?.id ?? 0),
-                    username: knownUser?.username ?? username,
-                };
+                const username = String((u as { username: unknown }).username).replace('@', '').trim();
+                return getUserByUsername(username)?.username ?? username;
             }
-            return null;
+            return '';
         };
 
-        const normalizeField = (f: unknown): IssueField | null => {
-            if (!f) return null;
-            if (typeof f === 'string') return { id: 0, name: f };
-            if (typeof f === 'object' && f !== null) {
-                const field = f as Partial<IssueField> & { name?: unknown; color?: unknown };
-                if (typeof field.name === 'string') {
-                    return {
-                        id: typeof field.id === 'number' ? field.id : 0,
-                        name: field.name,
-                        color: typeof field.color === 'string' ? field.color : undefined,
-                    };
-                }
+        // Normalize type/severity/priority/status fields to plain name strings
+        const normalizeField = (f: unknown): string => {
+            if (!f) return '';
+            if (typeof f === 'string') return f;
+            if (typeof f === 'object' && f !== null && 'name' in f) {
+                return String((f as { name: unknown }).name) || '';
             }
-            return null;
+            return '';
+        };
+
+        const normalizeWatcher = (w: unknown): string => {
+            if (typeof w === 'string') return w;
+            if (typeof w === 'object' && w !== null && 'username' in w) return String((w as { username: unknown }).username);
+            return String(w);
         };
 
         const normalized: IssueDetailData = {
             id: Number(raw.id),
-            subject: raw.subject || '',
-            description: raw.description ?? null,
-            issue_type: normalizeField(raw.issue_type || raw.type) ?? <IssueField>{id: 1, name: "Default" },
-            severity: normalizeField(raw.severity) ?? <IssueField>{id: 1, name: "Default" },
-            priority: (normalizeField(raw.priority || raw.issue_priority) || (raw.priority ? { id: 0, name: String(raw.priority) } : null)) ?? <IssueField>{id: 1, name: "Default" },
-            status: normalizeField(raw.status) ?? <IssueField>{id: 1, name: "Default" },
-            creator: normalizeUser(raw.creator) || { id: 0, username: (raw.creator_name || raw.author || 'unknown') },
-            assignee: normalizeUser(raw.assignee || raw.assigned_to) || null,
-            deadline: raw.deadline ?? null,
-            created_at: raw.created_at || raw.created || new Date().toISOString(),
-            modified_at: raw.modified_at || raw.modified || raw.updated_at || new Date().toISOString(),
-            attachments: Array.isArray(raw.attachments) ? raw.attachments : [],
-            comments: Array.isArray(raw.comments) ? raw.comments : [],
-            activities: Array.isArray(raw.activities) ? raw.activities : [],
-            tags: Array.isArray(raw.tags) ? raw.tags : [],
-            watchers: Array.isArray(raw.watchers) ? raw.watchers : []
+            subject: String(raw.subject || ''),
+            description: raw.description ? String(raw.description) : null,
+            type: normalizeField(raw.type || raw.issue_type) || 'Bug',
+            severity: normalizeField(raw.severity) || 'Normal',
+            priority: normalizeField(raw.priority || raw.issue_priority) || 'Normal',
+            status: normalizeField(raw.status) || 'In Progress',
+            creator: normalizeUser(raw.creator) || String(raw.creator_name || raw.author || 'unknown'),
+            assignee: normalizeUser(raw.assignee || raw.assigned_to) || 'Unassigned',
+            deadline: raw.deadline ? String(raw.deadline) : null,
+            created_at: String(raw.created_at || raw.created || new Date().toISOString()),
+            modified_at: String(raw.modified_at || raw.modified || raw.updated_at || new Date().toISOString()),
+            attachments: Array.isArray(raw.attachments) ? raw.attachments as IssueDetailData['attachments'] : [],
+            comments: Array.isArray(raw.comments) ? raw.comments as IssueDetailData['comments'] : [],
+            activities: Array.isArray(raw.activities) ? raw.activities as IssueDetailData['activities'] : [],
+            tags: Array.isArray(raw.tags) ? raw.tags as IssueDetailData['tags'] : [],
+            watchers: Array.isArray(raw.watchers) ? (raw.watchers as unknown[]).map(normalizeWatcher) : [],
         };
 
-        try { console.debug('[fetchIssueDetail] normalized assignee:', normalized.assignee); } catch {};
         return normalized;
     } catch (error) {
         console.error("Error fetching issue details:", error);
