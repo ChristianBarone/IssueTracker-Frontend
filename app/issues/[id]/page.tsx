@@ -220,6 +220,58 @@ export default function IssueDetailPage() {
         return '#cbd5e1';
     };
 
+    const getActivityLabel = (fieldName: string | undefined | null, oldValue: string | null, newValue: string | null) => {
+        const field = String(fieldName ?? '').toLowerCase();
+
+        if (!field) return 'updated this issue';
+
+        if (field === 'issue') return 'created this issue';
+        if (field === 'assignee') return 'changed the assignee';
+        if (field === 'watchers') {
+            if (newValue?.toLowerCase().startsWith('added ')) return `added ${newValue.slice(6)}`;
+            if (oldValue?.toLowerCase().startsWith('removed ')) return `removed ${oldValue.slice(8)}`;
+            return 'updated watchers';
+        }
+        if (field === 'tags') {
+            if (newValue?.toLowerCase().startsWith('added ')) return `added tags: ${newValue.slice(6)}`;
+            if (oldValue?.toLowerCase().startsWith('removed ')) return `removed tags: ${oldValue.slice(8)}`;
+            return 'updated tags';
+        }
+        if (field === 'comments') {
+            const next = (newValue || '').toLowerCase();
+            const prev = (oldValue || '').toLowerCase();
+            if (next.startsWith('added comment:')) return 'added a comment';
+            if (next.startsWith('edited to:') || prev.startsWith('edited from:')) return 'edited a comment';
+            if (prev.startsWith('deleted comment:')) return 'deleted a comment';
+            return 'updated comments';
+        }
+        if (field === 'subject') return 'changed the subject';
+        if (field === 'description') return 'changed the description';
+        if (field === 'status') return 'changed the status';
+        if (field === 'type') return 'changed the type';
+        if (field === 'severity') return 'changed the severity';
+        if (field === 'priority') return 'changed the priority';
+        if (field === 'deadline') return 'changed the deadline';
+
+        return `updated ${fieldName}`;
+    };
+
+    const getActivityUser = (activity: { actor?: string; user?: string }) => {
+        return activity.actor || activity.user || 'System';
+    };
+
+    const getActivityField = (activity: { field_name?: string; field?: string }) => {
+        return activity.field_name || activity.field || '';
+    };
+
+    const getActivityOldValue = (activity: { old_value?: string | null; old?: string | null }) => {
+        return activity.old_value ?? activity.old ?? null;
+    };
+
+    const getActivityNewValue = (activity: { new_value?: string | null; new?: string | null }) => {
+        return activity.new_value ?? activity.new ?? null;
+    };
+
     if (loading) return <div className="p-10 text-center text-zinc-400 font-medium">Loading issue data...</div>;
     if (!issue) return <div className="flex flex-col gap-5 p-10 text-center text-red-500 font-medium">
         Issue not found.
@@ -404,14 +456,14 @@ export default function IssueDetailPage() {
                                 {issue.activities?.map(act => (
                                     <div key={act.id} className="flex gap-3 text-sm">
                                         <div className="w-7 h-7 rounded-full bg-zinc-500 text-white flex items-center justify-center font-bold text-xs uppercase">
-                                            {act.actor ? act.actor.slice(0,1) : 'U'}
+                                            {getActivityUser(act).slice(0, 1)}
                                         </div>
                                         <div>
                                             <div className="text-zinc-800">
-                                                <strong>{act.actor}</strong> updated <span className="text-amber-600 font-semibold">{act.field_name}</span>
+                                                <strong>{getActivityUser(act)}</strong> {getActivityLabel(getActivityField(act), getActivityOldValue(act), getActivityNewValue(act))}
                                             </div>
                                             <div className="text-xs text-zinc-400 mt-0.5">
-                                                {act.old_value || '-'} → {act.new_value || '-'}
+                                                {getActivityOldValue(act) || '-'} → {getActivityNewValue(act) || '-'}
                                             </div>
                                         </div>
                                     </div>
