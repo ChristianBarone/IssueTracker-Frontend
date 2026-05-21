@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
 import { getApiBaseUrl } from '../../lib/apiBaseUrl';
 import { getStoredApiKey, USERNAMES } from '../../lib/auth';
+import { fetchEntities } from '../../settings/settingsService';
 
 export default function CreateIssuePage() {
     const router = useRouter();
@@ -20,10 +21,38 @@ export default function CreateIssuePage() {
         deadline: ''
     });
 
+    const [statuses, setStatuses] = useState<Array<{ name: string }>>([]);
+    const [types, setTypes] = useState<Array<{ name: string }>>([]);
+    const [severities, setSeverities] = useState<Array<{ name: string }>>([]);
+    const [priorities, setPriorities] = useState<Array<{ name: string }>>([]);
     const [loading, setLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
     const getApiKey = () => getStoredApiKey();
+
+    useEffect(() => {
+        const loadEntities = async () => {
+            const apiKey = getApiKey();
+            if (!apiKey) return;
+
+            try {
+                const [statusList, typeList, severityList, priorityList] = await Promise.all([
+                    fetchEntities('statuses', apiKey),
+                    fetchEntities('types', apiKey),
+                    fetchEntities('severities', apiKey),
+                    fetchEntities('priorities', apiKey)
+                ]);
+
+                setStatuses(statusList);
+                setTypes(typeList);
+                setSeverities(severityList);
+                setPriorities(priorityList);
+            } catch (err) {
+                console.error('Error loading settings entities:', err);
+            }
+        };
+        loadEntities();
+    }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         setFormData({
@@ -176,13 +205,13 @@ export default function CreateIssuePage() {
                                 onChange={handleChange}
                                 className="w-full bg-[#64748b] text-white font-semibold px-4 py-2.5 rounded text-sm outline-none cursor-pointer"
                             >
-                                <option value="New">New</option>
-                                <option value="In Progress">In Progress</option>
-                                <option value="Ready for test">Ready for test</option>
-                                <option value="Needs Info">Needs Info</option>
-                                <option value="Rejected">Rejected</option>
-                                <option value="Postponed">Postponed</option>
-                                <option value="Closed">Closed</option>
+                                {statuses.length > 0 ? (
+                                    statuses.map((status) => (
+                                        <option key={status.name} value={status.name}>{status.name}</option>
+                                    ))
+                                ) : (
+                                    <option value="">Loading...</option>
+                                )}
                             </select>
                         </div>
 
@@ -211,9 +240,13 @@ export default function CreateIssuePage() {
                                 onChange={handleChange}
                                 className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
                             >
-                                <option value="Bug">Bug</option>
-                                <option value="Question">Question</option>
-                                <option value="Enhancement">Enhancement</option>
+                                {types.length > 0 ? (
+                                    types.map((type) => (
+                                        <option key={type.name} value={type.name}>{type.name}</option>
+                                    ))
+                                ) : (
+                                    <option value="">Loading...</option>
+                                )}
                             </select>
                         </div>
 
@@ -226,11 +259,13 @@ export default function CreateIssuePage() {
                                 onChange={handleChange}
                                 className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
                             >
-                                <option value="Wishlist">Wishlist</option>
-                                <option value="Minor">Minor</option>
-                                <option value="Normal">Normal</option>
-                                <option value="Important">Important</option>
-                                <option value="Critical">Critical</option>
+                                {severities.length > 0 ? (
+                                    severities.map((severity) => (
+                                        <option key={severity.name} value={severity.name}>{severity.name}</option>
+                                    ))
+                                ) : (
+                                    <option value="">Loading...</option>
+                                )}
                             </select>
                         </div>
 
@@ -243,9 +278,13 @@ export default function CreateIssuePage() {
                                 onChange={handleChange}
                                 className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700"
                             >
-                                <option value="Low">Low</option>
-                                <option value="Normal">Normal</option>
-                                <option value="High">High</option>
+                                {priorities.length > 0 ? (
+                                    priorities.map((priority) => (
+                                        <option key={priority.name} value={priority.name}>{priority.name}</option>
+                                    ))
+                                ) : (
+                                    <option value="">Loading...</option>
+                                )}
                             </select>
                         </div>
 

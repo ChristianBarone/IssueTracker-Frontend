@@ -1,15 +1,3 @@
-export interface UserProfile {
-    id: number;
-    username: string;
-    avatar_url?: string;
-}
-
-export interface IssueField {
-    id: number;
-    name: string;
-    color?: string;
-}
-
 export interface Attachment {
     id: number;
     name: string;
@@ -17,13 +5,14 @@ export interface Attachment {
     creator: string;
 }
 
+// API returns: { id, user, field, old, new, date }
 export interface Activity {
     id: number;
-    actor: string;
-    field_name: string;
-    old_value: string | null;
-    new_value: string | null;
-    created_at: string;
+    user: string;
+    field: string;
+    old: string | null;
+    new: string | null;
+    date: string;
 }
 
 export interface Comment {
@@ -39,16 +28,18 @@ export interface Tag {
     color: string;
 }
 
+// All fields (status, priority, severity, type, creator, assignee)
+// are returned as plain strings by the API, not nested objects.
 export interface IssueDetailData {
     id: number;
     subject: string;
     description: string | null;
-    issue_type: IssueField;
-    severity: IssueField;
-    priority: IssueField;
-    status: IssueField;
-    creator: UserProfile;
-    assignee: UserProfile | null;
+    type: string;           // GET field name is "type" (PUT uses "issue_type")
+    severity: string;
+    priority: string;
+    status: string;
+    creator: string;        // plain username string
+    assignee: string;       // plain username string or "Unassigned"
     deadline: string | null;
     created_at: string;
     modified_at: string;
@@ -56,5 +47,5 @@ export interface IssueDetailData {
     comments: Comment[];
     activities: Activity[];
     tags: Tag[];
-    watchers: UserProfile[];
+    watchers: string[];
 }
