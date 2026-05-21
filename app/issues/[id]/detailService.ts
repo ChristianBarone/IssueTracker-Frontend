@@ -17,7 +17,7 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
         if (!res.ok) return null;
         const raw = (await res.json()) as Record<string, any>;
         // Debug: log raw backend response for assignee to help diagnose UI mismatch
-        try { console.debug('[fetchIssueDetail] raw assignee:', raw.assignee || raw.assigned_to); } catch {};
+        try { console.debug('[fetchIssueDetail] raw assignee:', raw.assignee || raw.assigned_to); } catch {}
 
         // Normalize user fields to plain username strings
         const normalizeUser = (u: unknown): string => {

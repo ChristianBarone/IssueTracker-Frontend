@@ -665,7 +665,7 @@ export default function IssueDetailPage() {
                                 <h3 className="text-lg font-bold text-[#2c3e50]">
                                     {issue.attachments?.length || 0} {(issue.attachments?.length === 1) ? 'Attachment' : 'Attachments'}
                                 </h3>
-                                <button onClick={() => fileRef.current?.click()} className="flex align-center justify-center w-7 h-7 font-bold bg-[#5dc5b5] text-white cursor-pointer rounded-sm">+</button>
+                                <button onClick={() => fileRef.current?.click()} className="flex align-center justify-center items-center w-7 h-7 font-bold bg-[#5dc5b5] text-white cursor-pointer rounded-sm">+</button>
                                 <input ref={fileRef} type="file" onChange={handleAddAttachment} hidden></input>
                                 <h2 className="text-sm text-[#2c3e50]">{uploading ? 'Uploading...' : ''}</h2>
                             </div>
@@ -695,13 +695,13 @@ export default function IssueDetailPage() {
                                 onClick={() => setActiveTab('comments')}
                                 className={`pb-2.5 cursor-pointer font-bold text-sm transition-colors ${activeTab === 'comments' ? 'text-[#4db6ac] border-b-2 border-[#4db6ac]' : 'text-zinc-400 hover:text-zinc-600'}`}
                             >
-                                {issue.comments?.length || 0} Comments
+                                {issue.comments?.length || 0} {issue.comments?.length === 1 ? 'Comment' : 'Comments'}
                             </button>
                             <button
                                 onClick={() => setActiveTab('activities')}
                                 className={`pb-2.5 cursor-pointer font-bold text-sm transition-colors ${activeTab === 'activities' ? 'text-[#4db6ac] border-b-2 border-[#4db6ac]' : 'text-zinc-400 hover:text-zinc-600'}`}
                             >
-                                {issue.activities?.length || 0} Activities
+                                {issue.activities?.length || 0} {issue.activities?.length === 1 ? 'Activity' : 'Activities'}
                             </button>
                         </div>
 

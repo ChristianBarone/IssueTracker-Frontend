@@ -169,7 +169,6 @@ export default function CreateIssuePage() {
                                 placeholder="Subject"
                                 className="w-full px-4 py-3 rounded border border-[#a3dbc5] bg-white text-base outline-none focus:border-[#4db6ac] transition-colors"
                             />
-                            {/* MODIFICADO: Agregado cursor-pointer */}
                             <button type="button" className="text-left text-[13px] text-[#4db6ac] hover:underline mt-1 font-medium cursor-pointer">
                                 Add tag +
                             </button>
@@ -221,7 +220,7 @@ export default function CreateIssuePage() {
                                     name="assigned_to"
                                     value={formData.assigned_to}
                                     onChange={handleChange}
-                                    className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700 cursor-pointer" // ◄ MODIFICADO: cursor-pointer
+                                    className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700 cursor-pointer"
                                 >
                                     <option value="">Unassigned</option>
                                     {AUTH_USERS.map((user) => (
@@ -248,7 +247,7 @@ export default function CreateIssuePage() {
                                 name="issue_type"
                                 value={formData.issue_type}
                                 onChange={handleChange}
-                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700 cursor-pointer" // ◄ MODIFICADO: cursor-pointer
+                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700 cursor-pointer"
                             >
                                 {types.length > 0 ? (
                                     types.map((type) => (
@@ -266,7 +265,7 @@ export default function CreateIssuePage() {
                                 name="issue_severity"
                                 value={formData.issue_severity}
                                 onChange={handleChange}
-                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700 cursor-pointer" // ◄ MODIFICADO: cursor-pointer
+                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700 cursor-pointer"
                             >
                                 {severities.length > 0 ? (
                                     severities.map((severity) => (
@@ -284,7 +283,7 @@ export default function CreateIssuePage() {
                                 name="priority"
                                 value={formData.priority}
                                 onChange={handleChange}
-                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700 cursor-pointer" // ◄ MODIFICADO: cursor-pointer
+                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700 cursor-pointer"
                             >
                                 {priorities.length > 0 ? (
                                     priorities.map((priority) => (
@@ -297,13 +296,13 @@ export default function CreateIssuePage() {
                         </div>
 
                         <div className="flex flex-col gap-1">
-                            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Deadline</label>
+                            <label className="cursor-pointer text-[11px] font-bold uppercase tracking-wider text-zinc-400">Deadline</label>
                             <input
                                 type="date"
                                 name="deadline"
                                 value={formData.deadline}
                                 onChange={handleChange}
-                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-600 font-mono cursor-pointer" // ◄ MODIFICADO: cursor-pointer
+                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-600 font-mono cursor-pointer"
                             />
                         </div>
 
