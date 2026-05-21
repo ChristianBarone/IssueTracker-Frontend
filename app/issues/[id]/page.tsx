@@ -36,14 +36,7 @@ export default function IssueDetailPage() {
     const [assigneeMessage, setAssigneeMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
     const [selectedUserId, setSelectedUserId] = useState<string>('');
-    const [availableUsers, setAvailableUsers] = useState<UserProfile[]>([
-        { id: 1, username: 'adminUser' },
-        { id: 2, username: 'Marti-Piris' },
-        { id: 3, username: 'Andreu-Caro' },
-        { id: 4, username: 'Hala-Alkhatib' },
-        { id: 5, username: 'Aleks-Shahverdyan' },
-        { id: 6, username: 'Christian-Alejandro-Barone' },
-    ]);
+    const [availableUsers, setAvailableUsers] = useState(AUTH_USERS);
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [descriptionInput, setDescriptionInput] = useState('');
 
@@ -102,6 +95,13 @@ export default function IssueDetailPage() {
         globalThis.addEventListener('storage', onStorage);
         return () => globalThis.removeEventListener('storage', onStorage);
     }, []);
+
+    // Actualizar availableUsers cuando issue carga
+    useEffect(() => {
+        if (issue) {
+            setAvailableUsers(AUTH_USERS.filter((user) => !issue.watchers.includes(user.username)));
+        }
+    }, [issue]);
 
     const isCreator = !!(issue && currentUser &&
         currentUser.replace('@', '').trim().toLowerCase() ===
@@ -201,11 +201,11 @@ export default function IssueDetailPage() {
         }
     };
 
-    const handleAddWatcherSubmit = async (e: React.FormEvent) => {
+    const handleAddWatcherSubmit = async (e: React.SubmitEvent) => {
         e.preventDefault();
         if (!selectedUserId || !issue) return;
         const idToNumber = Number(selectedUserId);
-        const userToAdd = availableUsers.find(u => u.id === idToNumber);
+        const userToAdd = availableUsers.find(u => u.id === idToNumber)?.username;
         if (!userToAdd) return;
         const success = await addWatcher(issueId, idToNumber);
         if (success) {
@@ -214,6 +214,7 @@ export default function IssueDetailPage() {
                 watchers: [...issue.watchers, userToAdd]
             });
             setSelectedUserId('');
+            setAvailableUsers(availableUsers.filter((user) => user.username !== userToAdd))
         } else {
             alert("No se ha podido añadir al watcher.");
         }
@@ -223,6 +224,11 @@ export default function IssueDetailPage() {
         if (!issue) return;
         const success = await deleteWatcher(issueId, userId);
         if (success) {
+            const newUsers = Array.from(availableUsers)
+            const user = AUTH_USERS.find(user => user.id === userId)
+            if (user) newUsers.push(user)
+
+            setAvailableUsers(newUsers)
             await loadData();
         } else {
             alert("No se ha podido eliminar al watcher.");
@@ -338,42 +344,6 @@ export default function IssueDetailPage() {
         if (field === 'severity') return 'changed the severity';
         if (field === 'priority') return 'changed the priority';
         if (field === 'deadline') return 'changed the deadline';
-        return `updated ${fieldName}`;
-    };
-
-    const getActivityLabel = (fieldName: string | undefined | null, oldValue: string | null, newValue: string | null) => {
-        const field = String(fieldName ?? '').toLowerCase();
-
-        if (!field) return 'updated this issue';
-
-        if (field === 'issue') return 'created this issue';
-        if (field === 'assignee') return 'changed the assignee';
-        if (field === 'watchers') {
-            if (newValue?.toLowerCase().startsWith('added ')) return `added ${newValue.slice(6)}`;
-            if (oldValue?.toLowerCase().startsWith('removed ')) return `removed ${oldValue.slice(8)}`;
-            return 'updated watchers';
-        }
-        if (field === 'tags') {
-            if (newValue?.toLowerCase().startsWith('added ')) return `added tags: ${newValue.slice(6)}`;
-            if (oldValue?.toLowerCase().startsWith('removed ')) return `removed tags: ${oldValue.slice(8)}`;
-            return 'updated tags';
-        }
-        if (field === 'comments') {
-            const next = (newValue || '').toLowerCase();
-            const prev = (oldValue || '').toLowerCase();
-            if (next.startsWith('added comment:')) return 'added a comment';
-            if (next.startsWith('edited to:') || prev.startsWith('edited from:')) return 'edited a comment';
-            if (prev.startsWith('deleted comment:')) return 'deleted a comment';
-            return 'updated comments';
-        }
-        if (field === 'subject') return 'changed the subject';
-        if (field === 'description') return 'changed the description';
-        if (field === 'status') return 'changed the status';
-        if (field === 'type') return 'changed the type';
-        if (field === 'severity') return 'changed the severity';
-        if (field === 'priority') return 'changed the priority';
-        if (field === 'deadline') return 'changed the deadline';
-
         return `updated ${fieldName}`;
     };
 
@@ -906,23 +876,16 @@ export default function IssueDetailPage() {
 
                         {/* Lista de watchers actuales */}
                         <ul className="mb-4 flex flex-col gap-2">
-                            {issue.watchers?.map((watcher: any, index) => {
+                            {issue.watchers?.map((watcher: string) => {
                                 // Como ya vienen normalizados del servicio, 'watcher' siempre tendrá id y username válidos
                                 return (
-                                    <li key={`${watcher.id}-${index}`} className="flex justify-between items-center text-sm bg-zinc-50 p-2 rounded border border-zinc-100">
+                                    <li key={`${watcher}`} className="flex justify-between items-center text-sm bg-zinc-50 p-2 rounded border border-zinc-100">
                                         <div className="flex items-center gap-2">
-                                            {watcher.avatar_url ? (
-                                                <img className="w-6 h-6 rounded-full object-cover" src={watcher.avatar_url} alt="Avatar" />
-                                            ) : (
-                                                <span className="w-6 h-6 rounded-full bg-[#4db6ac] text-white flex items-center justify-center text-[10px] font-bold uppercase">
-                                                    {(watcher.username?.slice(0, 2) || '??')}
-                                                </span>
-                                            )}
-                                            <span className="text-zinc-700 font-medium text-xs">@{watcher.username || 'unknown'}</span>
+                                            <span className="text-zinc-700 font-medium text-xs">@{watcher || 'unknown'}</span>
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={() => handleDeleteWatcher(watcher.id)}
+                                            onClick={() => handleDeleteWatcher(getUserIdByUsername(watcher) ?? 0)}
                                             className="text-zinc-400 hover:text-red-500 font-bold transition-colors text-xs px-1 cursor-pointer"
                                         >
                                             ✕

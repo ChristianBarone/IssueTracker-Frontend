@@ -43,7 +43,6 @@ export default function IssuesPage() {
     const [statuses, setStatuses] = useState<Array<{ name: string; color?: string }>>([]);
     const [assignedToCounts, setAssignedToCounts] = useState<BackendCounts>({});
     const [localStatusChanges, setLocalStatusChanges] = useState<Record<number, string>>({});
-    const [statuses, setStatuses] = useState<Array<{ name: string; color?: string }>>([]);
 
     const [filters, setFilters] = useState<IssueFilterState>({
         search: '',
