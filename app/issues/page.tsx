@@ -2,16 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getFilteredIssues, IssueFilterState, IssueListResult } from './issueService';
+import {filterIssues, getIssues, IssueFilterState, IssueListResult} from './issueService';
 import { getStoredApiKey, getStoredUsername } from '../lib/auth';
 import { fetchEntities } from '../settings/settingsService';
 
-interface IssueField {
+export interface IssueField {
     name: string;
     color?: string;
 }
 
-interface Issue {
+export interface Issue {
     id: number;
     subject: string;
     description: string | null;
@@ -29,12 +29,12 @@ interface BackendCounts {
 }
 
 export default function IssuesPage() {
+    const [rawIssues, setRawIssues] = useState<Issue[]>([])
     const [issues, setIssues] = useState<Issue[]>([]);
     const [totalCount, setTotalCount] = useState<number>(0);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [showFilters, setShowFilters] = useState<boolean>(false);
-    const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
     const [typeCounts, setTypeCounts] = useState<BackendCounts>({});
     const [severityCounts, setSeverityCounts] = useState<BackendCounts>({});
@@ -58,11 +58,27 @@ export default function IssuesPage() {
     const currentUser = getStoredUsername() ?? 'Andreu-Caro';
 
     const handleSort = (field: string) => {
-        setFilters(prev => {
-            const nextOrder = prev.order_by === field ? `-${field}` : field;
-            return { ...prev, order_by: nextOrder };
-        });
+        const newFilters = { ...filters, order_by: filters.order_by === field ? `-${field}` : field };
+        setFilters(newFilters);
+        setIssues(filterIssues(newFilters, rawIssues))
     };
+
+    const handleCheckboxChange = (category: keyof Omit<IssueFilterState, 'search' | 'order_by'>, value: string) => {
+        const currentList = filters[category];
+        const updatedList = currentList.includes(value)
+            ? currentList.filter(item => item !== value)
+            : [...currentList, value];
+
+        const newFilters = {...filters, [category]: updatedList}
+        setFilters(newFilters);
+        setIssues(filterIssues(newFilters, rawIssues))
+    };
+
+    const handleSearchChange = (query: string) => {
+        const newFilters = {...filters, search: query}
+        setFilters(newFilters)
+        setIssues(filterIssues(newFilters, rawIssues))
+    }
 
     const renderSortIcon = (field: string) => {
         const isCurrent = filters.order_by.replace('-', '') === field;
@@ -96,7 +112,7 @@ export default function IssuesPage() {
                 }
 
                 const currentFilters = JSON.parse(filtersString) as IssueFilterState;
-                const data: IssueListResult = await getFilteredIssues(currentFilters, apiKey);
+                const data: IssueListResult = await getIssues();
                 if (isMounted) {
                     if (data.error) {
                         setError(data.error);
@@ -120,6 +136,7 @@ export default function IssuesPage() {
                             : ((issue.status as IssueField | null) || { name: 'In Progress' })
                     }));
 
+                    setRawIssues(normalizedIssues);
                     setIssues(normalizedIssues);
                     setTotalCount(data.total_count || 0);
 
@@ -138,7 +155,7 @@ export default function IssuesPage() {
         };
         loadIssues();
         return () => { isMounted = false; };
-    }, [filtersString, refreshTrigger, apiKey]);
+    }, []);
 
     useEffect(() => {
         let isMounted = true;
@@ -162,16 +179,6 @@ export default function IssuesPage() {
         loadStatuses();
         return () => { isMounted = false; };
     }, []);
-
-    const handleCheckboxChange = (category: keyof Omit<IssueFilterState, 'search' | 'order_by'>, value: string) => {
-        setFilters(prev => {
-            const currentList = prev[category];
-            const updatedList = currentList.includes(value)
-                ? currentList.filter(item => item !== value)
-                : [...currentList, value];
-            return { ...prev, [category]: updatedList };
-        });
-    };
 
     const formatDate = (dateStr: string | null) => {
         if (!dateStr) return 'No date';
@@ -217,7 +224,7 @@ export default function IssuesPage() {
                             type="text"
                             placeholder="Search subject, description or ID..."
                             value={filters.search}
-                            onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                            onChange={(e) => handleSearchChange(e.target.value)}
                             style={{ width: '100%', padding: '10px 15px', border: '2px solid #e2e8f0', borderRadius: '5px', fontSize: '14px', outline: 'none' }}
                         />
                     </div>
