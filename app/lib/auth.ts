@@ -46,7 +46,7 @@ export function getUserByUsername(username: string): AuthUser | null {
 }
 
 export function getUserById(id: number): AuthUser | null {
-  return AUTH_USERS.find((user) => user.id === id) ?? null;
+    return AUTH_USERS.find((user) => user.id === id) ?? null;
 }
 export function getStoredUser() {
   try {

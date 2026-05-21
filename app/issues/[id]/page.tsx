@@ -369,7 +369,7 @@ export default function IssueDetailPage() {
                                         <div key={att.id} className="flex flex-row justify-between items-center">
                                             <a href={att.url} target="_blank" rel="noreferrer"
                                                className="text-[#4db6ac] hover:underline font-medium cursor-pointer">{att.name}</a>
-                                            {att.creator_id as unknown as string == getUserId(currentUser) ?
+                                            {att.creator_id == getUserIdByUsername(currentUser ?? '') ?
                                                 <button onClick={() => handleDeleteAttachmentClick(att.id)}
                                                         className="cursor-pointer w-7.75 border-2 border-red-500 text-red-500 font-bold p-1 transition duration-200 hover:bg-red-500 hover:text-white">X
                                                 </button>
