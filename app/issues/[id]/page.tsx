@@ -608,13 +608,13 @@ export default function IssueDetailPage() {
                         <div className="flex gap-6 border-b border-zinc-200 mb-6">
                             <button
                                 onClick={() => setActiveTab('comments')}
-                                className={`pb-2.5 cursor-pointer font-bold text-sm transition-colors ${activeTab === 'comments' ? 'text-[#4db6ac] border-b-2 border-[#4db6ac]' : 'text-zinc-400 hover:text-zinc-600'}`}
+                                className="pb-2.5 cursor-pointer font-bold text-sm transition-colors text-[#4db6ac] border-b-2 border-[#4db6ac]"
                             >
                                 {issue.comments?.length || 0} Comments
                             </button>
                             <button
                                 onClick={() => setActiveTab('activities')}
-                                className={`pb-2.5 cursor-pointer font-bold text-sm transition-colors ${activeTab === 'activities' ? 'text-[#4db6ac] border-b-2 border-[#4db6ac]' : 'text-zinc-400 hover:text-zinc-600'}`}
+                                className="pb-2.5 cursor-pointer font-bold text-sm transition-colors text-zinc-400 hover:text-zinc-600"
                             >
                                 {issue.activities?.length || 0} Activities
                             </button>
@@ -677,7 +677,13 @@ export default function IssueDetailPage() {
                                         return (
                                             <div key={com.id} className="p-4 border border-zinc-100 rounded-md bg-zinc-50/30">
                                                 <div className="flex items-center gap-2 text-xs mb-2">
-                                                    <span className="text-[#4db6ac] font-bold">@{com.author?.replace('@', '')}</span>
+                                                    {/* ARREGLADO: Cambiado span por Link con getProfileHref para poder ir al perfil */}
+                                                    <Link
+                                                        href={getProfileHref(com.author || '')}
+                                                        className="text-[#4db6ac] font-bold cursor-pointer hover:underline"
+                                                    >
+                                                        @{com.author?.replace('@', '')}
+                                                    </Link>
                                                     <span className="text-zinc-400">{getRelativeTimeString(com.created_at)}</span>
                                                 </div>
                                                 {editingCommentId === com.id ? (
@@ -813,7 +819,7 @@ export default function IssueDetailPage() {
                                 value={currentAssigneeValue}
                                 onChange={handleAssigneeSelectChange}
                                 disabled={isSavingAssignee}
-                                className="text-xs px-2 py-1.5 border border-zinc-200 rounded outline-none bg-zinc-50/50 text-zinc-700"
+                                className="text-xs px-2 py-1.5 border border-zinc-200 rounded outline-none bg-zinc-50/50 text-zinc-700 cursor-pointer" // ◄ MODIFICADO: cursor-pointer
                             >
                                 <option value="">Unassigned</option>
                                 {AUTH_USERS.map((user) => (
@@ -823,7 +829,7 @@ export default function IssueDetailPage() {
                             <button
                                 onClick={handleAssignToMe}
                                 disabled={!canAssignToMe || isSavingAssignee}
-                                className="bg-zinc-100 text-zinc-700 border border-zinc-300 hover:bg-zinc-200 text-xs font-bold px-2.5 py-1.5 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="bg-zinc-100 text-zinc-700 border border-zinc-300 hover:bg-zinc-200 text-xs font-bold px-2.5 py-1.5 rounded disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer" // ◄ MODIFICADO: cursor-pointer
                             >
                                 Assign to me
                             </button>
@@ -842,7 +848,7 @@ export default function IssueDetailPage() {
                             {isCreator && (
                                 <button
                                     onClick={() => setOpenPicker(openPicker === 'tags' ? null : 'tags')}
-                                    className="text-xs text-[#4db6ac] hover:underline font-medium"
+                                    className="text-xs text-[#4db6ac] hover:underline font-medium cursor-pointer" // ◄ MODIFICADO: cursor-pointer
                                 >
                                     + Add tag
                                 </button>
@@ -887,7 +893,7 @@ export default function IssueDetailPage() {
                                     {isCreator && (
                                         <button
                                             onClick={() => handleRemoveTag(tag.id)}
-                                            className="ml-0.5 hover:opacity-70 leading-none text-sm"
+                                            className="ml-0.5 hover:opacity-70 leading-none text-sm cursor-pointer" // ◄ MODIFICADO: cursor-pointer
                                             title="Remove tag"
                                         >×</button>
                                     )}
@@ -906,7 +912,6 @@ export default function IssueDetailPage() {
                         {/* Lista de watchers actuales */}
                         <ul className="mb-4 flex flex-col gap-2">
                             {issue.watchers?.map((watcher: string) => {
-                                // Como ya vienen normalizados del servicio, 'watcher' siempre tendrá id y username válidos
                                 return (
                                     <li key={`${watcher}`} className="flex justify-between items-center text-sm bg-zinc-50 p-2 rounded border border-zinc-100">
                                         <div className="flex items-center gap-2">
@@ -929,7 +934,7 @@ export default function IssueDetailPage() {
                                 name="user_id"
                                 value={selectedUserId}
                                 onChange={(e) => setSelectedUserId(e.target.value)}
-                                className="flex-1 bg-white border border-zinc-200 rounded text-xs p-2 outline-none focus:border-zinc-400 text-zinc-600"
+                                className="flex-1 bg-white border border-zinc-200 rounded text-xs p-2 outline-none focus:border-zinc-400 text-zinc-600 cursor-pointer" // ◄ MODIFICADO: cursor-pointer
                             >
                                 <option value="">Add user...</option>
                                 {availableUsers.map((user) => (
@@ -940,7 +945,7 @@ export default function IssueDetailPage() {
                             </select>
                             <button
                                 type="submit"
-                                className="bg-zinc-100 text-zinc-700 border border-zinc-200 px-3 py-1.5 rounded text-sm font-bold hover:bg-zinc-200 active:bg-zinc-300 transition-colors"
+                                className="bg-zinc-100 text-zinc-700 border border-zinc-200 px-3 py-1.5 rounded text-sm font-bold hover:bg-zinc-200 active:bg-zinc-300 transition-colors cursor-pointer" // ◄ MODIFICADO: cursor-pointer
                             >
                                 +
                             </button>
