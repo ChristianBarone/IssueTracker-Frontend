@@ -226,11 +226,8 @@ export default function IssueDetailPage() {
         if (!userToAdd) return;
         const success = await addWatcher(issueId, idToNumber);
         if (success) {
-            setIssue({
-                ...issue,
-                watchers: [...issue.watchers, userToAdd]
-            });
             setSelectedUserId('');
+            await loadData();
             setAvailableUsers(availableUsers.filter((user) => user.username !== userToAdd))
         } else {
             alert("No se ha podido añadir al watcher.");
@@ -379,6 +376,8 @@ export default function IssueDetailPage() {
     const getActivityNewValue = (activity: { new_value?: string | null; new?: string | null }) => {
         return activity.new_value ?? activity.new ?? null;
     };
+
+    const getProfileHref = (value: string) => `/profile/${encodeURIComponent(value.replace('@', '').trim())}`;
 
     if (loading) return <div className="p-10 text-center text-zinc-400 font-medium">Loading issue data...</div>;
     if (!issue) return (
@@ -630,7 +629,17 @@ export default function IssueDetailPage() {
                                         </div>
                                         <div>
                                             <div className="text-zinc-800">
-                                                <strong>{act.user || 'System'}</strong> {getActivityLabel(act.field, act.old, act.new)}
+                                                {act.user ? (
+                                                    <Link
+                                                        href={getProfileHref(act.user)}
+                                                        className="font-bold text-[#4db6ac] hover:underline"
+                                                    >
+                                                        {act.user}
+                                                    </Link>
+                                                ) : (
+                                                    <strong>System</strong>
+                                                )}{' '}
+                                                {getActivityLabel(act.field, act.old, act.new)}
                                             </div>
                                             <div className="text-xs text-zinc-400 mt-0.5">
                                                 {act.old || '-'} → {act.new || '-'}
@@ -788,9 +797,12 @@ export default function IssueDetailPage() {
                     {/* CREATOR */}
                     <div className="flex justify-between items-center py-3 border-b border-zinc-100 text-sm">
                         <span className="text-zinc-400">Creator</span>
-                        <span className="font-bold text-zinc-700">
+                        <Link
+                            href={getProfileHref(creatorName)}
+                            className="font-bold text-zinc-700 hover:text-[#4db6ac] hover:underline"
+                        >
                             @{creatorName.replace('@', '')}
-                        </span>
+                        </Link>
                     </div>
 
                     {/* ASSIGNEE */}

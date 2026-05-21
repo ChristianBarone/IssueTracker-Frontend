@@ -190,6 +190,8 @@ export default function IssuesPage() {
         return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     };
 
+    const getProfileHref = (username: string) => `/profile/${encodeURIComponent(username.replace('@', '').trim())}`;
+
     const getStatusColor = (statusName: string | undefined): string => {
         if (!statusName) return '#CCCCCC';
         const needle = statusName.trim().toLowerCase();
@@ -455,7 +457,16 @@ export default function IssuesPage() {
                                                     <span style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#34495e', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold', marginRight: '8px' }}>
                                                         {issue.assignee ? issue.assignee.slice(0, 2).toUpperCase() : '-'}
                                                     </span>
-                                                    <span style={{ color: '#34495e', fontSize: '13px' }}>{issue.assignee || 'Unassigned'}</span>
+                                                    {issue.assignee ? (
+                                                        <Link
+                                                            href={getProfileHref(issue.assignee)}
+                                                            style={{ color: '#34495e', fontSize: '13px', textDecoration: 'none', fontWeight: 500 }}
+                                                        >
+                                                            {issue.assignee}
+                                                        </Link>
+                                                    ) : (
+                                                        <span style={{ color: '#34495e', fontSize: '13px' }}>Unassigned</span>
+                                                    )}
                                                 </div>
                                             </td>
 
