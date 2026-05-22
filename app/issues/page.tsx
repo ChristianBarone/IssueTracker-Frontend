@@ -272,9 +272,6 @@ export default function IssuesPage() {
     };
 
     useEffect(() => {
-        const apiKey = getStoredApiKey();
-        if (!apiKey) return;
-
         const usernames = new Set<string>();
 
         rawIssues.forEach((issue) => {

@@ -4,7 +4,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AUTH_USERS, getStoredApiKey, getStoredUsername, getUserIdByUsername } from '../../lib/auth';
 import { fetchEntities } from '../../settings/settingsService';
-import { createIssue } from "@/app/issues/issueService";
+import {createIssue, updateIssueFields} from "@/app/issues/issueService";
 
 export default function CreateIssuePage() {
     const router = useRouter();
@@ -80,7 +80,7 @@ export default function CreateIssuePage() {
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
         e.preventDefault();
         setLoading(true);
         setStatusMessage(null);
@@ -113,28 +113,12 @@ export default function CreateIssuePage() {
                 dataEnvelope.append('files', file);
             });
 
-            const baseUrl = getApiBaseUrl();
-
-            const response = await fetchWithTimeout(`${baseUrl}/issues/`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': apiKey
-                },
-                body: dataEnvelope
-            });
-
+            const response = await createIssue(dataEnvelope)
             const data = await response.json().catch(() => ({}));
 
             if (response.ok) {
                 if (selectedTags.length > 0 && data.id) {
-                    await fetchWithTimeout(`${baseUrl}/issues/${data.id}/`, {
-                        method: 'PUT',
-                        headers: {
-                            'Authorization': apiKey,
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ tags: selectedTags.map(t => t.id) }),
-                    });
+                    await updateIssueFields(data.id, { tags: selectedTags.map(t => t.id) })
                 }
                 setStatusMessage({ text: `Successfully created issue #${data.id}!`, isError: false });
                 router.push('/issues');
@@ -212,7 +196,7 @@ export default function CreateIssuePage() {
                                     <button
                                         type="button"
                                         onClick={() => setShowTagPicker(prev => !prev)}
-                                        className="text-left text-[13px] text-[#4db6ac] hover:underline font-medium"
+                                        className="text-left text-[13px] text-[#4db6ac] hover:underline font-medium cursor-pointer"
                                     >
                                         Add tag +
                                     </button>
@@ -233,7 +217,7 @@ export default function CreateIssuePage() {
                                                         }}
                                                         className="flex items-center gap-2.5 px-3 py-2 cursor-pointer text-sm hover:bg-zinc-50 text-zinc-700"
                                                     >
-                                                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#cbd5e1' }} />
+                                                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tag.color || '#cbd5e1' }} />
                                                         <span>{tag.name}</span>
                                                     </div>
                                                 ))
@@ -355,21 +339,22 @@ export default function CreateIssuePage() {
                         </div>
 
                         <div className="flex flex-col gap-1">
-                            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Priority</label>
-                            <select
-                                name="priority"
-                                value={formData.priority}
-                                onChange={handleChange}
-                                className="w-full bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700 cursor-pointer"
-                            >
-                                {priorities.length > 0 ? (
-                                    priorities.map((priority) => (
-                                        <option key={priority.name} value={priority.name}>{priority.name}</option>
-                                    ))
-                                ) : (
-                                    <option value="">Loading...</option>
-                                )}
-                            </select>
+                            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Priority
+                                <select
+                                    name="priority"
+                                    value={formData.priority}
+                                    onChange={handleChange}
+                                    className="w-full font-normal bg-white border border-zinc-300 rounded px-3 py-2 text-sm outline-none text-zinc-700 cursor-pointer"
+                                >
+                                    {priorities.length > 0 ? (
+                                        priorities.map((priority) => (
+                                            <option key={priority.name} value={priority.name}>{priority.name}</option>
+                                        ))
+                                    ) : (
+                                        <option value="">Loading...</option>
+                                    )}
+                                </select>
+                            </label>
                         </div>
 
                         <div className="flex flex-col gap-1">

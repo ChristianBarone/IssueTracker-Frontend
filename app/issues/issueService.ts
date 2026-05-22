@@ -1,6 +1,6 @@
 import { fetchWithTimeout } from "../lib/fetchWithTimeout";
 import {getApiBaseUrl, getFormDataHeaders, getHeaders} from "../lib/apiBaseUrl";
-import {Issue, IssueField} from "@/app/issues/page";
+import {Issue} from "@/app/issues/page";
 
 export interface IssueFilterState {
     search: string;
@@ -52,6 +52,8 @@ const STATUS_COLORS: Record<string, string> = {
     'Rejected': '#A0A0B0',
     'Postponed': '#4070E4'
 };
+
+const baseUrl = getApiBaseUrl();
 
 
 function orderIssues(parameter: string) {
@@ -220,7 +222,7 @@ export async function getIssues(): Promise<IssueListResult> {
 }
 
 export async function createIssue(body: FormData) {
-    return await fetchWithTimeout(`${getApiBaseUrl()}/issues/`, {
+    return await fetchWithTimeout(`${baseUrl}/issues/`, {
         method: 'POST',
         headers: getFormDataHeaders(),
         body: body
@@ -228,7 +230,7 @@ export async function createIssue(body: FormData) {
 }
 
 export async function createIssueBulk(list: string[]) {
-    return await fetch('https://issuetracker-ff8u.onrender.com/issues/bulk/', {
+    return await fetch(`${baseUrl}/issues/bulk/`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify({list})
@@ -237,7 +239,7 @@ export async function createIssueBulk(list: string[]) {
 
 export async function updateIssueFields(id: number, fields: Record<string, unknown>): Promise<boolean> {
     try {
-        const baseUrl = getApiBaseUrl();
+
         const res = await fetchWithTimeout(`${baseUrl}/issues/${id}/`, {
             method: 'PUT',
             headers: getHeaders(),

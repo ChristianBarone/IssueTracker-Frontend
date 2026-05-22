@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   getStoredUsername,
   setStoredUser,
-  AUTH_USERS,
   USERNAMES,
 } from '../lib/auth';
 

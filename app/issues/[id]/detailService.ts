@@ -1,7 +1,7 @@
-import { IssueDetailData } from './types';
-import { fetchWithTimeout } from '../../lib/fetchWithTimeout';
-import { getApiBaseUrl, getHeaders} from '../../lib/apiBaseUrl';
-import { getStoredApiKey, getUserById, getUserByUsername } from '../../lib/auth';
+import {IssueDetailData} from './types';
+import {fetchWithTimeout} from '../../lib/fetchWithTimeout';
+import {getApiBaseUrl, getHeaders} from '../../lib/apiBaseUrl';
+import {getStoredApiKey, getUserById, getUserByUsername} from '../../lib/auth';
 
 const baseUrl = getApiBaseUrl();
 
@@ -24,7 +24,7 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
             if (!u) return '';
             if (typeof u === 'number') return getUserById(u)?.username ?? '';
             if (typeof u === 'string') return u.replace('@', '').trim();
-            if (typeof u === 'object' && u !== null && 'username' in u) {
+            if (typeof u === 'object' && 'username' in u) {
                 const username = String((u as { username: unknown }).username).replace('@', '').trim();
                 return getUserByUsername(username)?.username ?? username;
             }
@@ -35,7 +35,7 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
         const normalizeField = (f: unknown): string => {
             if (!f) return '';
             if (typeof f === 'string') return f;
-            if (typeof f === 'object' && f !== null && 'name' in f) {
+            if (typeof f === 'object' && 'name' in f) {
                 return String((f as { name: unknown }).name) || '';
             }
             return '';
@@ -47,7 +47,7 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
             return String(w);
         };
 
-        const normalized: IssueDetailData = {
+        return {
             id: Number(raw.id),
             subject: String(raw.subject || ''),
             description: raw.description ? String(raw.description) : null,
@@ -64,23 +64,21 @@ export async function fetchIssueDetail(id: number): Promise<IssueDetailData | nu
             comments: Array.isArray(raw.comments) ? raw.comments as IssueDetailData['comments'] : [],
             activities: Array.isArray(raw.activities) ? raw.activities as IssueDetailData['activities'] : [],
             tags: Array.isArray(raw.tags) ? raw.tags.map((t: unknown): IssueDetailData['tags'][number] => {
-            if (typeof t === 'number') return { id: t, name: '', color: '' };
-            if (typeof t === 'object' && t !== null) {
-                const obj = t as Record<string, unknown>;
-                return {
-                    id: Number(obj.id ?? 0),
-                    name: String(obj.name ?? ''),
-                    color: String(obj.color ?? ''),
-                };
-            }
-            return { id: 0, name: String(t ?? ''), color: '' };
-        }) : [],
+                if (typeof t === 'number') return {id: t, name: '', color: ''};
+                if (typeof t === 'object' && t !== null) {
+                    const obj = t as Record<string, unknown>;
+                    return {
+                        id: Number(obj.id ?? 0),
+                        name: String(obj.name ?? ''),
+                        color: String(obj.color ?? ''),
+                    };
+                }
+                return {id: 0, name: String(t ?? ''), color: ''};
+            }) : [],
             watchers: Array.isArray(raw.watchers)
                 ? raw.watchers.map(normalizeUser).filter(u => u !== null)
                 : [],
         };
-
-        return normalized;
     } catch (error) {
         console.error("Error fetching issue details:", error);
         return null;

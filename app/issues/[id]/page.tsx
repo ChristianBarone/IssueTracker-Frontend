@@ -188,7 +188,7 @@ export default function IssueDetailPage() {
         }
     };
 
-    const handlePublishComment = async (e: React.FormEvent<HTMLFormElement>) => {
+    const handlePublishComment = async (e: React.SubmitEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!newCommentBody.trim()) return;
         const success = await addComment(issueId, newCommentBody);
