@@ -7,7 +7,6 @@
 
 # Autors
 ID de grup: it115
-****
 **Andreu Caro** ``andreu.percy.caro@estudiantat.upc.edu``<br>
 **Martí Piris** ``marti.piris@estudiantat.upc.edu`` <br>
 **Hala Alkhatib** ``hala.alkhatib@estudiantat.upc.edu`` <br>

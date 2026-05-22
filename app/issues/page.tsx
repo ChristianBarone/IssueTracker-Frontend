@@ -1,10 +1,12 @@
 'use client';
 
+import Image from 'next/image'
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getFilteredIssues, IssueFilterState, updateIssueFields, IssueListResult } from './issueService';
 import { getStoredApiKey, getStoredUsername } from '../lib/auth';
 import { fetchEntities } from '../settings/settingsService';
+import { fetchProfile } from '../profile/profileService'
 
 interface IssueField {
     name: string;
@@ -43,7 +45,7 @@ export default function IssuesPage() {
     const [statusCounts, setStatusCounts] = useState<BackendCounts>({});
     const [statuses, setStatuses] = useState<Array<{ name: string; color?: string }>>([]);
     const [assignedToCounts, setAssignedToCounts] = useState<BackendCounts>({});
-    const [localStatusChanges, setLocalStatusChanges] = useState<Record<number, string>>({});
+    const [userAvatars, setUserAvatars] = useState<Record<string, string | null>>({});
 
     const [filters, setFilters] = useState<IssueFilterState>({
         search: '',
@@ -228,6 +230,86 @@ export default function IssuesPage() {
         if (!countsObj) return 0;
         return countsObj[key] ?? (countsObj[key.toLowerCase()] === undefined ? 0 : countsObj[key.toLowerCase()]);
     };
+
+    const normalizeUsername = (value: string) => value.replace('@', '').trim();
+
+    const getUserAvatar = (value: string) => userAvatars[normalizeUsername(value)] ?? null;
+
+    const UserAvatar = ({ username, size = 28 }: { username: string; size?: number }) => {
+        const avatarUrl = getUserAvatar(username);
+        const initials = normalizeUsername(username).slice(0, 2).toUpperCase() || 'U';
+
+        return (
+            <div
+                className="relative flex-shrink-0 overflow-hidden rounded-full bg-zinc-500 text-white flex items-center justify-center font-bold uppercase"
+                style={{ width: size, height: size }}
+            >
+                {avatarUrl ? (
+                    <Image
+                        src={avatarUrl}
+                        alt={`Avatar of ${normalizeUsername(username)}`}
+                        fill
+                        unoptimized
+                        sizes={`${size}px`}
+                        className="object-cover"
+                    />
+                ) : (
+                    <span className="text-[10px] leading-none">{initials}</span>
+                )}
+            </div>
+        );
+    };
+
+    useEffect(() => {
+        const apiKey = getStoredApiKey();
+        if (!apiKey) return;
+
+        const usernames = new Set<string>();
+
+        rawIssues.forEach((issue) => {
+            const assignee = normalizeUsername(comment.assignee);
+            if (assignee) usernames.add(assignee);
+        });
+
+        issue.activities.forEach((activity) => {
+            const actor = normalizeUsername(getActivityUser(activity));
+            if (actor && actor.toLowerCase() !== 'system') usernames.add(actor);
+        });
+
+        const missingUsernames = Array.from(usernames).filter((username) => userAvatars[username] === undefined);
+        if (missingUsernames.length === 0) return;
+
+        let cancelled = false;
+
+        const loadAvatars = async () => {
+            const results = await Promise.all(
+                missingUsernames.map(async (username) => {
+                    try {
+                        const profile = await fetchProfile(username, apiKey);
+                        return [username, profile.avatar ?? null] as const;
+                    } catch {
+                        return [username, null] as const;
+                    }
+                })
+            );
+
+            if (cancelled) return;
+
+            setUserAvatars((prev) => {
+                const next = { ...prev };
+                results.forEach(([username, avatarUrl]) => {
+                    next[username] = avatarUrl;
+                });
+                return next;
+            });
+        };
+
+        void loadAvatars();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [rawIssues, userAvatars]);
 
     return (
         <div style={{
@@ -845,7 +927,7 @@ export default function IssuesPage() {
                                                     }}>
                                                         {issue.assignee ? issue.assignee.slice(0, 2).toUpperCase() : '-'}
                                                     </span>
-                                                {issue.assignee ? (
+                                                {issue.assignee && issue.assignee !== "Unassigned" ? (
                                                     <Link
                                                         href={getProfileHref(issue.assignee)}
                                                         style={{

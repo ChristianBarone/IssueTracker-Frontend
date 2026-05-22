@@ -1,5 +1,5 @@
 import { fetchWithTimeout } from "../lib/fetchWithTimeout";
-import { getApiBaseUrl } from "../lib/apiBaseUrl";
+import {getApiBaseUrl, getHeaders} from "../lib/apiBaseUrl";
 
 export interface ProfileIssue {
     id: number;
@@ -53,15 +53,12 @@ export interface ProfileData {
     auth_key?: string;
 }
 
-export async function fetchProfile(username: string, apiKey: string): Promise<ProfileData> {
+export async function fetchProfile(username: string): Promise<ProfileData> {
     // Try once, and retry once on abort/timeout errors
     try {
         const response = await fetchWithTimeout(`${getApiBaseUrl()}/profile/${encodeURIComponent(username)}`, {
             method: 'GET',
-            headers: {
-                Authorization: apiKey,
-                'Content-Type': 'application/json'
-            }
+            headers: getHeaders()
         });
 
         const payload = await response.json();
@@ -78,10 +75,7 @@ export async function fetchProfile(username: string, apiKey: string): Promise<Pr
             await new Promise((r) => setTimeout(r, 500));
             const response = await fetchWithTimeout(`${getApiBaseUrl()}/profile/${encodeURIComponent(username)}`, {
                 method: 'GET',
-                headers: {
-                    Authorization: apiKey,
-                    'Content-Type': 'application/json'
-                }
+                headers: getHeaders()
             });
 
             const payload = await response.json();
