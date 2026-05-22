@@ -25,6 +25,9 @@ export default function CreateIssuePage() {
     const [types, setTypes] = useState<Array<{ name: string }>>([]);
     const [severities, setSeverities] = useState<Array<{ name: string }>>([]);
     const [priorities, setPriorities] = useState<Array<{ name: string }>>([]);
+    const [allTags, setAllTags] = useState<Array<{ id: number; name: string; color: string }>>([]);
+    const [selectedTags, setSelectedTags] = useState<Array<{ id: number; name: string; color: string }>>([]);
+    const [showTagPicker, setShowTagPicker] = useState(false);
     const [loading, setLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
@@ -41,17 +44,19 @@ export default function CreateIssuePage() {
             if (!apiKey) return;
 
             try {
-                const [statusList, typeList, severityList, priorityList] = await Promise.all([
+                const [statusList, typeList, severityList, priorityList, tagList] = await Promise.all([
                     fetchEntities('statuses', apiKey),
                     fetchEntities('types', apiKey),
                     fetchEntities('severities', apiKey),
-                    fetchEntities('priorities', apiKey)
+                    fetchEntities('priorities', apiKey),
+                    fetchEntities('tags', apiKey),
                 ]);
 
                 setStatuses(statusList);
                 setTypes(typeList);
                 setSeverities(severityList);
                 setPriorities(priorityList);
+                setAllTags(tagList as Array<{ id: number; name: string; color: string }>);
             } catch (err) {
                 console.error('Error loading settings entities:', err);
             }
@@ -108,10 +113,29 @@ export default function CreateIssuePage() {
                 dataEnvelope.append('files', file);
             });
 
-            const response = await createIssue(dataEnvelope)
-            const data = await response.json()
+            const baseUrl = getApiBaseUrl();
+
+            const response = await fetchWithTimeout(`${baseUrl}/issues/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': apiKey
+                },
+                body: dataEnvelope
+            });
+
+            const data = await response.json().catch(() => ({}));
 
             if (response.ok) {
+                if (selectedTags.length > 0 && data.id) {
+                    await fetchWithTimeout(`${baseUrl}/issues/${data.id}/`, {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': apiKey,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ tags: selectedTags.map(t => t.id) }),
+                    });
+                }
                 setStatusMessage({ text: `Successfully created issue #${data.id}!`, isError: false });
                 router.push('/issues');
             } else {
@@ -169,9 +193,62 @@ export default function CreateIssuePage() {
                                 placeholder="Subject"
                                 className="w-full px-4 py-3 rounded border border-[#a3dbc5] bg-white text-base outline-none focus:border-[#4db6ac] transition-colors"
                             />
-                            <button type="button" className="text-left text-[13px] text-[#4db6ac] hover:underline mt-1 font-medium cursor-pointer">
-                                Add tag +
-                            </button>
+                            <div className="relative mt-1">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    {selectedTags.map(tag => (
+                                        <span
+                                            key={tag.id}
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                                            style={{ backgroundColor: tag.color || '#888' }}
+                                        >
+                                            {tag.name}
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedTags(prev => prev.filter(t => t.id !== tag.id))}
+                                                className="ml-0.5 hover:opacity-70 leading-none text-sm"
+                                            >×</button>
+                                        </span>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowTagPicker(prev => !prev)}
+                                        className="text-left text-[13px] text-[#4db6ac] hover:underline font-medium"
+                                    >
+                                        Add tag +
+                                    </button>
+                                </div>
+                                {showTagPicker && (
+                                    <div className="absolute z-10 mt-1 bg-white border border-zinc-200 rounded-lg shadow-md overflow-hidden w-56">
+                                        {allTags.filter(t => !selectedTags.some(s => s.id === t.id)).length === 0 ? (
+                                            <div className="px-3 py-2 text-xs text-zinc-400 text-center">All tags applied</div>
+                                        ) : (
+                                            allTags
+                                                .filter(t => !selectedTags.some(s => s.id === t.id))
+                                                .map(tag => (
+                                                    <div
+                                                        key={tag.id}
+                                                        onClick={() => {
+                                                            setSelectedTags(prev => [...prev, tag]);
+                                                            setShowTagPicker(false);
+                                                        }}
+                                                        className="flex items-center gap-2.5 px-3 py-2 cursor-pointer text-sm hover:bg-zinc-50 text-zinc-700"
+                                                    >
+                                                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#cbd5e1' }} />
+                                                        <span>{tag.name}</span>
+                                                    </div>
+                                                ))
+                                        )}
+                                        <div className="border-t border-zinc-100">
+                                            <div
+                                                onClick={() => setShowTagPicker(false)}
+                                                className="px-3 py-2 text-xs text-zinc-400 cursor-pointer hover:text-zinc-600 text-center"
+                                            >
+                                                Cancel
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <div>
