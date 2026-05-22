@@ -1,5 +1,5 @@
 import { fetchWithTimeout } from "../lib/fetchWithTimeout";
-import {getApiBaseUrl, getHeaders} from "../lib/apiBaseUrl";
+import {getApiBaseUrl, getFormDataHeaders, getHeaders} from "../lib/apiBaseUrl";
 
 export interface ProfileIssue {
     id: number;
@@ -93,7 +93,6 @@ export async function fetchProfile(username: string): Promise<ProfileData> {
 
 export async function updateProfile(
     username: string,
-    apiKey: string,
     data: { bio: string; avatar?: File | null }
 ): Promise<ProfileData> {
     const formData = new FormData();
@@ -106,9 +105,7 @@ export async function updateProfile(
     try {
         const response = await fetchWithTimeout(`${getApiBaseUrl()}/profile/${encodeURIComponent(username)}`, {
             method: 'PUT',
-            headers: {
-                Authorization: apiKey
-            },
+            headers: getFormDataHeaders(),
             body: formData
         });
 
@@ -125,9 +122,7 @@ export async function updateProfile(
             await new Promise((r) => setTimeout(r, 500));
             const response = await fetchWithTimeout(`${getApiBaseUrl()}/profile/${encodeURIComponent(username)}`, {
                 method: 'PUT',
-                headers: {
-                    Authorization: apiKey
-                },
+                headers: getFormDataHeaders(),
                 body: formData
             });
 

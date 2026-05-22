@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { fetchProfile, ProfileData, ProfileIssue } from '../profileService';
-import { clearStoredUser, getStoredApiKey } from '../../lib/auth';
+import { clearStoredUser } from '../../lib/auth';
 
 function formatDate(value: string | null | undefined) {
     if (!value) return 'No date available';
@@ -149,12 +149,7 @@ export default function ProfilePage() {
             setProfile(null);
 
             try {
-                const apiKey = getStoredApiKey();
-                if (!apiKey) {
-                    throw new Error('Session expired. Please sign in again.');
-                }
-
-                const data = await fetchProfile(username, apiKey);
+                const data = await fetchProfile(username);
                 if (mounted) {
                     setProfile(data);
                 }
@@ -282,7 +277,7 @@ export default function ProfilePage() {
                                         href={`/profile/${encodeURIComponent(profile.username)}/edit`}
                                         className="inline-flex min-h-12 items-center justify-center rounded-lg bg-gradient-to-b from-[#82e9de] to-[#59d8cc] px-4 font-bold text-slate-900 shadow-[0_6px_0_#40bbb1] transition-transform hover:-translate-y-px"
                                     >
-                                        EDIT BIO
+                                        EDIT PROFILE
                                     </Link>
                                 )}
                                 <Link

@@ -413,10 +413,6 @@ export default function IssueDetailPage() {
 
     useEffect(() => {
         if (!issue) return;
-
-        const apiKey = getStoredApiKey();
-        if (!apiKey) return;
-
         const usernames = new Set<string>();
 
         issue.comments.forEach((comment) => {
@@ -438,7 +434,7 @@ export default function IssueDetailPage() {
             const results = await Promise.all(
                 missingUsernames.map(async (username) => {
                     try {
-                        const profile = await fetchProfile(username, apiKey);
+                        const profile = await fetchProfile(username);
                         return [username, profile.avatar ?? null] as const;
                     } catch {
                         return [username, null] as const;

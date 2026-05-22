@@ -239,17 +239,20 @@ export default function IssuesPage() {
         return countsObj[key] ?? (countsObj[key.toLowerCase()] === undefined ? 0 : countsObj[key.toLowerCase()]);
     };
 
-    const normalizeUsername = (value: string) => value.replace('@', '').trim();
+    const normalizeUsername = (value: string | null) => value ? value.replace('@', '').trim() : ''
 
     const getUserAvatar = (value: string) => userAvatars[normalizeUsername(value)] ?? null;
 
-    const UserAvatar = ({ username, size = 28 }: { username: string; size?: number }) => {
+    const UserAvatar = ({ username, size = 28 }: { username: string | null; size?: number }) => {
+        if (!username)
+            return <span className="text-[10px] leading-none">UN</span>
+
         const avatarUrl = getUserAvatar(username);
         const initials = normalizeUsername(username).slice(0, 2).toUpperCase() || 'U';
 
         return (
             <div
-                className="relative flex-shrink-0 overflow-hidden rounded-full bg-zinc-500 text-white flex items-center justify-center font-bold uppercase"
+                className="relative shrink-0 overflow-hidden rounded-full bg-zinc-500 text-white flex items-center justify-center font-bold uppercase"
                 style={{ width: size, height: size }}
             >
                 {avatarUrl ? (
@@ -275,13 +278,8 @@ export default function IssuesPage() {
         const usernames = new Set<string>();
 
         rawIssues.forEach((issue) => {
-            const assignee = normalizeUsername(comment.assignee);
-            if (assignee) usernames.add(assignee);
-        });
-
-        issue.activities.forEach((activity) => {
-            const actor = normalizeUsername(getActivityUser(activity));
-            if (actor && actor.toLowerCase() !== 'system') usernames.add(actor);
+            const assignee = normalizeUsername(issue.assignee);
+            if (assignee.length > 0) usernames.add(assignee);
         });
 
         const missingUsernames = Array.from(usernames).filter((username) => userAvatars[username] === undefined);
@@ -293,7 +291,7 @@ export default function IssuesPage() {
             const results = await Promise.all(
                 missingUsernames.map(async (username) => {
                     try {
-                        const profile = await fetchProfile(username, apiKey);
+                        const profile = await fetchProfile(username);
                         return [username, profile.avatar ?? null] as const;
                     } catch {
                         return [username, null] as const;
@@ -920,21 +918,7 @@ export default function IssuesPage() {
 
                                         <td style={{padding: '18px 15px', textAlign: 'left'}}>
                                             <div style={{display: 'flex', alignItems: 'center'}}>
-                                                    <span style={{
-                                                        width: '24px',
-                                                        height: '24px',
-                                                        borderRadius: '50%',
-                                                        backgroundColor: '#34495e',
-                                                        color: 'white',
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        fontSize: '10px',
-                                                        fontWeight: 'bold',
-                                                        marginRight: '8px'
-                                                    }}>
-                                                        {issue.assignee ? issue.assignee.slice(0, 2).toUpperCase() : '-'}
-                                                    </span>
+                                                <UserAvatar username={issue.assignee} />
                                                 {issue.assignee && issue.assignee !== "Unassigned" ? (
                                                     <Link
                                                         href={getProfileHref(issue.assignee)}
@@ -942,13 +926,14 @@ export default function IssuesPage() {
                                                             color: '#34495e',
                                                             fontSize: '13px',
                                                             textDecoration: 'none',
-                                                            fontWeight: 500
+                                                            fontWeight: 500,
+                                                            marginLeft: '5px',
                                                         }}
                                                     >
                                                         {issue.assignee}
                                                     </Link>
                                                 ) : (
-                                                    <span style={{color: '#34495e', fontSize: '13px'}}>Unassigned</span>
+                                                    <span style={{color: '#34495e', fontSize: '13px', marginLeft: '5px'}}>Unassigned</span>
                                                 )}
                                             </div>
                                         </td>
