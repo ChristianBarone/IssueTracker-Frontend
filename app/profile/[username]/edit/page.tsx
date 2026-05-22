@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { fetchProfile, updateProfile } from '../../profileService';
@@ -73,7 +73,7 @@ export default function EditProfilePage() {
         setAvatarPreview(file ? URL.createObjectURL(file) : null);
     };
 
-    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
         event.preventDefault();
         setSaving(true);
         setError(null);

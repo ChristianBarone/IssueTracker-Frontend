@@ -82,7 +82,7 @@ function itemToForm(item: AnyEntity): FormState {
         color: item.color || '#5dc5b5',
         is_closed: s.is_closed ?? false,
         is_default: od.is_default ?? false,
-        days_offset: d.days_offset != null ? String(d.days_offset) : '0',
+        days_offset: d.days_offset == null ? '0' : String(d.days_offset),
         before_or_after: d.before_or_after ?? 'before',
     };
 }
@@ -92,7 +92,7 @@ function formToData(form: FormState, config: EntityConfig): Record<string, unkno
     if (config.hasClosed) data.is_closed = form.is_closed;
     if (config.hasDefault) data.is_default = form.is_default;
     if (config.hasDaysOffset) {
-        data.days_offset = parseInt(form.days_offset, 10) || 0;
+        data.days_offset = Number.parseInt(form.days_offset, 10) || 0;
         data.before_or_after = form.before_or_after;
     }
     return data;
@@ -200,7 +200,7 @@ export default function SettingsPage() {
         setEditModal({mode: 'edit', item});
     };
 
-    const handleSaveEdit = async (e: React.FormEvent) => {
+    const handleSaveEdit = async (e: React.SubmitEvent) => {
         e.preventDefault();
         if (!apiKey || !editModal) return;
         setModalError(null);
@@ -262,7 +262,7 @@ export default function SettingsPage() {
                 backgroundColor: '#f5f7fb',
             }}
         >
-            <div className="mx-auto w-full max-w-[1100px]">
+            <div className="mx-auto w-full max-w-275">
 
                 {/* Page header */}
                 <div className="mb-6 flex items-center justify-between">
@@ -279,7 +279,7 @@ export default function SettingsPage() {
                 </div>
 
                 {pageError && (
-                    <div className="mb-4 rounded-[12px] border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                    <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
                         {pageError}
                         <button
                             onClick={loadAll}
@@ -336,7 +336,7 @@ export default function SettingsPage() {
                             </div>
                             <button
                                 onClick={openCreateModal}
-                                className="inline-flex shrink-0 items-center gap-2 rounded-[10px] bg-gradient-to-b from-[#82e9de] to-[#59d8cc] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-[0_6px_0_#40bbb1] transition-transform hover:-translate-y-px cursor-pointer"
+                                className="inline-flex shrink-0 items-center gap-2 rounded-[10px] bg-linear-to-b from-[#82e9de] to-[#59d8cc] px-4 py-2.5 text-sm font-bold text-slate-900 shadow-[0_6px_0_#40bbb1] transition-transform hover:-translate-y-px cursor-pointer"
                             >
                                 + ADD NEW {config.singular.toUpperCase()}
                             </button>
@@ -345,13 +345,17 @@ export default function SettingsPage() {
                         {/* Table area */}
                         {loading ? (
                             <div className="py-14 text-center text-slate-400">Loading settings…</div>
-                        ) : items.length === 0 ? (
+                        ) : ''}
+
+                        {items.length === 0 ? (
                             <div
                                 className="rounded-[14px] border border-slate-200 bg-slate-50 py-12 text-center text-slate-400">
                                 No {config.label.toLowerCase()} yet. Add one above.
                             </div>
-                        ) : (
-                            <div className="overflow-hidden rounded-[12px] border border-slate-200">
+                        ) : '' }
+
+                        {!loading && items.length !== 0 ? (
+                            <div className="overflow-hidden rounded-xl border border-slate-200">
                                 <table className="w-full text-sm">
                                     <thead>
                                     <tr className="border-b border-slate-200 bg-slate-50">
@@ -416,7 +420,7 @@ export default function SettingsPage() {
                                                             <button
                                                                 onClick={() => handleMoveUp(item.id)}
                                                                 disabled={isFirst || busy}
-                                                                className="rounded-[6px] p-1.5 text-[11px] text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-20 cursor-pointer"
+                                                                className="rounded-md p-1.5 text-[11px] text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-20 cursor-pointer"
                                                                 title="Move up"
                                                             >
                                                                 ▲
@@ -424,7 +428,7 @@ export default function SettingsPage() {
                                                             <button
                                                                 onClick={() => handleMoveDown(item.id)}
                                                                 disabled={isLast || busy}
-                                                                className="rounded-[6px] p-1.5 text-[11px] text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-20 cursor-pointer"
+                                                                className="rounded-md p-1.5 text-[11px] text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-20 cursor-pointer"
                                                                 title="Move down"
                                                             >
                                                                 ▼
@@ -434,7 +438,7 @@ export default function SettingsPage() {
                                                 )}
                                                 <td className="px-4 py-3">
                                                         <span
-                                                            className="inline-block h-6 w-6 rounded-[4px] border border-slate-200"
+                                                            className="inline-block h-6 w-6 rounded-sm border border-slate-200"
                                                             style={{backgroundColor: item.color || '#cbd5e1'}}
                                                         />
                                                 </td>
@@ -450,7 +454,7 @@ export default function SettingsPage() {
                                                     <td className="px-4 py-3 text-center">
                                                         <input
                                                             type="checkbox"
-                                                            checked={!!statusItem.is_closed}
+                                                            checked={statusItem.is_closed}
                                                             onChange={() => handleToggleClosed(statusItem)}
                                                             disabled={busy}
                                                             className="h-4 w-4 cursor-pointer accent-[#2f93b8]"
@@ -482,15 +486,15 @@ export default function SettingsPage() {
                                                     <div className="flex justify-end gap-2">
                                                         <button
                                                             onClick={() => openEditModal(item)}
-                                                            className="rounded-[8px] bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-200 cursor-pointer"
+                                                            className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-200 cursor-pointer"
                                                         >
                                                             Edit
                                                         </button>
                                                         <button
                                                             onClick={() => canDelete && openDeleteModal(item)}
                                                             disabled={!canDelete}
-                                                            title={!canDelete ? 'Cannot delete the only remaining item' : undefined}
-                                                            className="rounded-[8px] bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-500 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-30 cursor-pointer"
+                                                            title={canDelete ? undefined : 'Cannot delete the only remaining item'}
+                                                            className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-500 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-30 cursor-pointer"
                                                         >
                                                             Delete
                                                         </button>
@@ -502,7 +506,7 @@ export default function SettingsPage() {
                                     </tbody>
                                 </table>
                             </div>
-                        )}
+                        ) : ''}
                     </div>
                 </div>
             </div>
@@ -519,7 +523,7 @@ export default function SettingsPage() {
                         <form onSubmit={handleSaveEdit} className="grid gap-4">
                             {modalError && (
                                 <div
-                                    className="rounded-[12px] border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+                                    className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
                                     {modalError}
                                 </div>
                             )}
@@ -528,31 +532,31 @@ export default function SettingsPage() {
                                 <label
                                     className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
                                     Name
+                                    <input
+                                        type="text"
+                                        required
+                                        value={formData.name}
+                                        onChange={e => setFormData(prev => ({...prev, name: e.target.value}))}
+                                        className="font-normal w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#2f93b8] focus:ring-2 focus:ring-[#2f93b8]/10"
+                                        placeholder={`${config.singular} name`}
+                                    />
                                 </label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.name}
-                                    onChange={e => setFormData(prev => ({...prev, name: e.target.value}))}
-                                    className="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#2f93b8] focus:ring-2 focus:ring-[#2f93b8]/10"
-                                    placeholder={`${config.singular} name`}
-                                />
                             </div>
 
                             <div>
                                 <label
                                     className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
                                     Color
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="color"
+                                            value={formData.color}
+                                            onChange={e => setFormData(prev => ({...prev, color: e.target.value}))}
+                                            className="h-10 w-16 cursor-pointer rounded-lg border border-slate-200 p-0.5"
+                                        />
+                                        <span className="font-mono text-sm text-slate-500">{formData.color}</span>
+                                    </div>
                                 </label>
-                                <div className="flex items-center gap-3">
-                                    <input
-                                        type="color"
-                                        value={formData.color}
-                                        onChange={e => setFormData(prev => ({...prev, color: e.target.value}))}
-                                        className="h-10 w-16 cursor-pointer rounded-[8px] border border-slate-200 p-0.5"
-                                    />
-                                    <span className="font-mono text-sm text-slate-500">{formData.color}</span>
-                                </div>
                             </div>
 
                             {config.hasClosed && (
@@ -638,7 +642,7 @@ export default function SettingsPage() {
                                 <button
                                     type="submit"
                                     disabled={busy}
-                                    className="rounded-[10px] bg-gradient-to-b from-[#82e9de] to-[#59d8cc] px-5 py-2.5 text-sm font-bold text-slate-900 shadow-[0_4px_0_#40bbb1] transition-transform hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                                    className="rounded-[10px] bg-linear-to-b from-[#82e9de] to-[#59d8cc] px-5 py-2.5 text-sm font-bold text-slate-900 shadow-[0_4px_0_#40bbb1] transition-transform hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
                                 >
                                     {busy ? 'Saving…' : 'Save'}
                                 </button>
@@ -664,7 +668,7 @@ export default function SettingsPage() {
                             </div>
                         )}
 
-                        {config.needsReplacement && items.filter(i => i.id !== deleteModal.item.id).length > 0 ? (
+                        {config.needsReplacement && items.some(i => i.id !== deleteModal.item.id) ? (
                             <div className="mt-4 mb-5">
                                 <p className="mb-4 text-sm text-slate-600">
                                     Issues currently using <strong>{deleteModal.item.name}</strong> will be

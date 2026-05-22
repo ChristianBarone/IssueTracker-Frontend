@@ -20,7 +20,7 @@ export interface OrderedDefaultEntity extends BaseEntity {
     is_default: boolean;
 }
 
-export interface TagEntity extends BaseEntity {}
+export type TagEntity = BaseEntity
 
 export interface DueDateEntity extends BaseEntity {
     days_offset: number;
