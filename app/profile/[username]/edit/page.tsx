@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { fetchProfile, updateProfile } from '../../profileService';
-import { getStoredApiKey } from '../../../lib/auth';
 
 export default function EditProfilePage() {
     const params = useParams<{ username: string }>();
@@ -32,12 +31,7 @@ export default function EditProfilePage() {
             setError(null);
 
             try {
-                const apiKey = getStoredApiKey();
-                if (!apiKey) {
-                    throw new Error('Session expired. Please sign in again.');
-                }
-
-                const profile = await fetchProfile(username, apiKey);
+                const profile = await fetchProfile(username);
                 if (!mounted) return;
 
                 setBio(profile.bio || '');
@@ -85,12 +79,7 @@ export default function EditProfilePage() {
         setError(null);
 
         try {
-            const apiKey = getStoredApiKey();
-            if (!apiKey) {
-                throw new Error('Session expired. Please sign in again.');
-            }
-
-            await updateProfile(username, apiKey, { bio, avatar: avatarFile });
+            await updateProfile(username, { bio, avatar: avatarFile });
             router.push(`/profile/${encodeURIComponent(username)}`);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to save profile.');
@@ -109,7 +98,7 @@ export default function EditProfilePage() {
                 backgroundColor: '#f5f7fb'
             }}
         >
-            <div className="mx-auto w-full max-w-[860px]">
+            <div className="mx-auto w-full max-w-215">
                 <div className="rounded-[18px] border border-slate-200/90 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)] md:p-6">
                     <div className="mb-6 flex items-start justify-between gap-4">
                         <div>
@@ -125,7 +114,7 @@ export default function EditProfilePage() {
                     ) : (
                         <>
                             <div className="mb-6 flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-center">
-                                <div className="relative grid h-[110px] w-[110px] shrink-0 place-items-center overflow-hidden rounded-[10px] bg-gradient-to-b from-slate-950 to-slate-900 text-[42px] font-bold text-white">
+                                <div className="relative grid h-27.5 w-27.5 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-linear-to-b from-slate-950 to-slate-900 text-[42px] font-bold text-white">
                                     {avatarPreview ? (
                                         <Image
                                             src={avatarPreview}
@@ -161,7 +150,7 @@ export default function EditProfilePage() {
                                         type="file"
                                         accept="image/*"
                                         onChange={(event) => handleAvatarChange(event.target.files?.[0] || null)}
-                                        className="block w-full rounded-[12px] border border-slate-200 bg-white p-3 text-sm outline-none focus:border-[#2f93b8] focus:ring-2 focus:ring-[#2f93b8]/10"
+                                        className="block w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-[#2f93b8] focus:ring-2 focus:ring-[#2f93b8]/10 cursor-pointer"
                                     />
                                     <div className="mt-2 text-sm text-slate-500">Upload a square image for best results.</div>
                                 </div>
@@ -175,21 +164,21 @@ export default function EditProfilePage() {
                                         rows={7}
                                         value={bio}
                                         onChange={(event) => setBio(event.target.value)}
-                                        className="block w-full rounded-[12px] border border-slate-200 bg-white p-3 text-sm outline-none focus:border-[#2f93b8] focus:ring-2 focus:ring-[#2f93b8]/10"
+                                        className="block w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-[#2f93b8] focus:ring-2 focus:ring-[#2f93b8]/10"
                                     />
                                 </div>
 
                                 <div className="flex justify-end gap-3">
                                     <Link
                                         href={`/profile/${encodeURIComponent(username)}`}
-                                        className="inline-flex items-center justify-center rounded-[10px] bg-slate-100 px-4 py-3 font-bold text-slate-700"
+                                        className="inline-flex items-center justify-center rounded-[10px] bg-slate-100 px-4 py-3 font-bold text-slate-700 cursor-pointer"
                                     >
                                         Cancel
                                     </Link>
                                     <button
                                         type="submit"
                                         disabled={saving}
-                                        className="inline-flex items-center justify-center rounded-[10px] bg-gradient-to-b from-[#82e9de] to-[#59d8cc] px-5 py-3 font-bold text-slate-900 shadow-[0_6px_0_#40bbb1] disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="inline-flex items-center justify-center rounded-[10px] bg-gradient-to-b from-[#82e9de] to-[#59d8cc] px-5 py-3 font-bold text-slate-900 shadow-[0_6px_0_#40bbb1] cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         {saving ? 'Saving…' : 'Save changes'}
                                     </button>

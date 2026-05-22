@@ -1,15 +1,18 @@
 'use client';
 
+import Image from 'next/image';
 import React, {useState, useEffect, useRef, useMemo} from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
     fetchIssueDetail, updateIssueFields, updateIssueAssignee, deleteIssue,
-    addComment, editComment, deleteComment, deleteAttachment, addAttachment
+    addComment, editComment, deleteComment, deleteAttachment, addAttachment,
+    addWatcher, deleteWatcher
 } from './detailService';
 import { IssueDetailData } from './types';
 import { AUTH_USERS, getStoredUsername, getStoredApiKey, getUserIdByUsername, getUserById } from '../../lib/auth';
 import { fetchEntities, AnyEntity } from '../../settings/settingsService';
+import { fetchProfile } from '../../profile/profileService';
 
 export default function IssueDetailPage() {
     const { id } = useParams();
@@ -34,6 +37,8 @@ export default function IssueDetailPage() {
     const [isSavingAssignee, setIsSavingAssignee] = useState(false);
     const [assigneeMessage, setAssigneeMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
+    const [selectedUserId, setSelectedUserId] = useState<string>('');
+    const [availableUsers, setAvailableUsers] = useState(AUTH_USERS);
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [descriptionInput, setDescriptionInput] = useState('');
 
@@ -45,6 +50,7 @@ export default function IssueDetailPage() {
     const [priorities, setPriorities] = useState<AnyEntity[]>([]);
     const [statuses, setStatuses] = useState<AnyEntity[]>([]);
     const [allTags, setAllTags] = useState<AnyEntity[]>([]);
+    const [userAvatars, setUserAvatars] = useState<Record<string, string | null>>({});
 
     const [openPicker, setOpenPicker] = useState<string | null>(null);
 
@@ -92,6 +98,13 @@ export default function IssueDetailPage() {
         globalThis.addEventListener('storage', onStorage);
         return () => globalThis.removeEventListener('storage', onStorage);
     }, []);
+
+    // Actualizar availableUsers cuando issue carga
+    useEffect(() => {
+        if (issue) {
+            setAvailableUsers(AUTH_USERS.filter((user) => !issue.watchers.includes(user.username)));
+        }
+    }, [issue]);
 
     const isCreator = !!(issue && currentUser &&
         currentUser.replace('@', '').trim().toLowerCase() ===
@@ -208,6 +221,37 @@ export default function IssueDetailPage() {
         }
     };
 
+    const handleAddWatcherSubmit = async (e: React.SubmitEvent) => {
+        e.preventDefault();
+        if (!selectedUserId || !issue) return;
+        const idToNumber = Number(selectedUserId);
+        const userToAdd = availableUsers.find(u => u.id === idToNumber)?.username;
+        if (!userToAdd) return;
+        const success = await addWatcher(issueId, idToNumber);
+        if (success) {
+            setSelectedUserId('');
+            await loadData();
+            setAvailableUsers(availableUsers.filter((user) => user.username !== userToAdd))
+        } else {
+            alert("No se ha podido añadir al watcher.");
+        }
+    };
+
+    const handleDeleteWatcher = async (userId: number) => {
+        if (!issue) return;
+        const success = await deleteWatcher(issueId, userId);
+        if (success) {
+            const newUsers = Array.from(availableUsers)
+            const user = AUTH_USERS.find(user => user.id === userId)
+            if (user) newUsers.push(user)
+
+            setAvailableUsers(newUsers)
+            await loadData();
+        } else {
+            alert("No se ha podido eliminar al watcher.");
+        }
+    };
+
     const handleAssigneeSelectChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const nextValue = e.target.value;
         setIsSavingAssignee(true);
@@ -287,6 +331,37 @@ export default function IssueDetailPage() {
         return `${weeks} week${weeks > 1 ? 's' : ''}, ${remainingDays} day${remainingDays === 1 ? '' : 's'} ago`;
     };
 
+    const normalizeUsername = (value: string) => value.replace('@', '').trim();
+
+    const getProfileHref = (value: string) => `/profile/${encodeURIComponent(normalizeUsername(value))}`;
+
+    const getUserAvatar = (value: string) => userAvatars[normalizeUsername(value)] ?? null;
+
+    const UserAvatar = ({ username, size = 28 }: { username: string; size?: number }) => {
+        const avatarUrl = getUserAvatar(username);
+        const initials = normalizeUsername(username).slice(0, 2).toUpperCase() || 'U';
+
+        return (
+            <div
+                className="relative flex-shrink-0 overflow-hidden rounded-full bg-zinc-500 text-white flex items-center justify-center font-bold uppercase"
+                style={{ width: size, height: size }}
+            >
+                {avatarUrl ? (
+                    <Image
+                        src={avatarUrl}
+                        alt={`Avatar of ${normalizeUsername(username)}`}
+                        fill
+                        unoptimized
+                        sizes={`${size}px`}
+                        className="object-cover"
+                    />
+                ) : (
+                    <span className="text-[10px] leading-none">{initials}</span>
+                )}
+            </div>
+        );
+    };
+
     const getActivityLabel = (fieldName: string | undefined | null, oldValue: string | null, newValue: string | null) => {
         const field = String(fieldName ?? '').toLowerCase();
         if (!field) return 'updated this issue';
@@ -319,6 +394,71 @@ export default function IssueDetailPage() {
         if (field === 'deadline') return 'changed the deadline';
         return `updated ${fieldName}`;
     };
+
+    const getActivityUser = (activity: { actor?: string; user?: string }) => {
+        return activity.actor || activity.user || 'System';
+    };
+
+    const getActivityField = (activity: { field_name?: string; field?: string }) => {
+        return activity.field_name || activity.field || '';
+    };
+
+    const getActivityOldValue = (activity: { old_value?: string | null; old?: string | null }) => {
+        return activity.old_value ?? activity.old ?? null;
+    };
+
+    const getActivityNewValue = (activity: { new_value?: string | null; new?: string | null }) => {
+        return activity.new_value ?? activity.new ?? null;
+    };
+
+    useEffect(() => {
+        if (!issue) return;
+        const usernames = new Set<string>();
+
+        issue.comments.forEach((comment) => {
+            const author = normalizeUsername(comment.author);
+            if (author) usernames.add(author);
+        });
+
+        issue.activities.forEach((activity) => {
+            const actor = normalizeUsername(getActivityUser(activity));
+            if (actor && actor.toLowerCase() !== 'system') usernames.add(actor);
+        });
+
+        const missingUsernames = Array.from(usernames).filter((username) => userAvatars[username] === undefined);
+        if (missingUsernames.length === 0) return;
+
+        let cancelled = false;
+
+        const loadAvatars = async () => {
+            const results = await Promise.all(
+                missingUsernames.map(async (username) => {
+                    try {
+                        const profile = await fetchProfile(username);
+                        return [username, profile.avatar ?? null] as const;
+                    } catch {
+                        return [username, null] as const;
+                    }
+                })
+            );
+
+            if (cancelled) return;
+
+            setUserAvatars((prev) => {
+                const next = { ...prev };
+                results.forEach(([username, avatarUrl]) => {
+                    next[username] = avatarUrl;
+                });
+                return next;
+            });
+        };
+
+        void loadAvatars();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [issue, userAvatars]);
 
     if (loading) return <div className="p-10 text-center text-zinc-400 font-medium">Loading issue data...</div>;
     if (!issue) return (
@@ -487,11 +627,11 @@ export default function IssueDetailPage() {
                         <div className="flex items-center justify-between border-b border-zinc-100 pb-2 mb-3">
                             <h3 className="text-base font-bold text-[#2c3e50]">Description</h3>
                             {isCreator && !isEditingDescription && (
-                                <span
+                                <button
                                     onClick={() => { setDescriptionInput(issue.description || ''); setIsEditingDescription(true); }}
                                     className="cursor-pointer text-zinc-400 hover:text-zinc-600 text-sm"
                                     title="Edit description"
-                                >✎</span>
+                                >✎</button>
                             )}
                         </div>
 
@@ -510,7 +650,7 @@ export default function IssueDetailPage() {
                                 </div>
                             </div>
                         ) : (
-                            <p className="text-sm text-zinc-600 leading-relaxed whitespace-pre-wrap min-h-[2rem]">
+                            <p className="text-sm text-zinc-600 leading-relaxed whitespace-pre-wrap min-h-8">
                                 {issue.description || <span className="italic text-zinc-400">No description provided</span>}
                             </p>
                         )}
@@ -521,7 +661,7 @@ export default function IssueDetailPage() {
                                 <h3 className="text-lg font-bold text-[#2c3e50]">
                                     {issue.attachments?.length || 0} {(issue.attachments?.length === 1) ? 'Attachment' : 'Attachments'}
                                 </h3>
-                                <button onClick={() => fileRef.current?.click()} className="flex align-center justify-center w-7 h-7 font-bold bg-[#5dc5b5] text-white cursor-pointer rounded-sm">+</button>
+                                <button onClick={() => fileRef.current?.click()} className="flex align-center justify-center items-center w-7 h-7 font-bold bg-[#5dc5b5] text-white cursor-pointer rounded-sm">+</button>
                                 <input ref={fileRef} type="file" onChange={handleAddAttachment} hidden></input>
                                 <h2 className="text-sm text-[#2c3e50]">{uploading ? 'Uploading...' : ''}</h2>
                             </div>
@@ -551,13 +691,13 @@ export default function IssueDetailPage() {
                                 onClick={() => setActiveTab('comments')}
                                 className={`pb-2.5 cursor-pointer font-bold text-sm transition-colors ${activeTab === 'comments' ? 'text-[#4db6ac] border-b-2 border-[#4db6ac]' : 'text-zinc-400 hover:text-zinc-600'}`}
                             >
-                                {issue.comments?.length || 0} Comments
+                                {issue.comments?.length || 0} {issue.comments?.length === 1 ? 'Comment' : 'Comments'}
                             </button>
                             <button
                                 onClick={() => setActiveTab('activities')}
                                 className={`pb-2.5 cursor-pointer font-bold text-sm transition-colors ${activeTab === 'activities' ? 'text-[#4db6ac] border-b-2 border-[#4db6ac]' : 'text-zinc-400 hover:text-zinc-600'}`}
                             >
-                                {issue.activities?.length || 0} Activities
+                                {issue.activities?.length || 0} {issue.activities?.length === 1 ? 'Activity' : 'Activities'}
                             </button>
                         </div>
 
@@ -565,12 +705,20 @@ export default function IssueDetailPage() {
                             <div className="flex flex-col gap-4">
                                 {issue.activities?.map(act => (
                                     <div key={act.id} className="flex gap-3 text-sm">
-                                        <div className="w-7 h-7 rounded-full bg-zinc-500 text-white flex items-center justify-center font-bold text-xs uppercase flex-shrink-0">
-                                            {act.user ? act.user.slice(0, 1) : 'U'}
-                                        </div>
+                                        <UserAvatar username={getActivityUser(act)} />
                                         <div>
                                             <div className="text-zinc-800">
-                                                <strong>{act.user || 'System'}</strong> {getActivityLabel(act.field, act.old, act.new)}
+                                                {act.user ? (
+                                                    <Link
+                                                        href={getProfileHref(act.user)}
+                                                        className="font-bold text-[#4db6ac] hover:underline"
+                                                    >
+                                                        {act.user}
+                                                    </Link>
+                                                ) : (
+                                                    <strong>System</strong>
+                                                )}{' '}
+                                                {getActivityLabel(act.field, act.old, act.new)}
                                             </div>
                                             <div className="text-xs text-zinc-400 mt-0.5">
                                                 {act.old || '-'} → {act.new || '-'}
@@ -607,34 +755,41 @@ export default function IssueDetailPage() {
                                         const isMyComment = cleanAuthor === cleanCommentUser;
                                         return (
                                             <div key={com.id} className="p-4 border border-zinc-100 rounded-md bg-zinc-50/30">
-                                                <div className="flex items-center gap-2 text-xs mb-2">
-                                                    <span className="text-[#4db6ac] font-bold">@{com.author?.replace('@', '')}</span>
-                                                    <span className="text-zinc-400">{getRelativeTimeString(com.created_at)}</span>
-                                                </div>
-                                                {editingCommentId === com.id ? (
-                                                    <div>
-                                                        <textarea
-                                                            value={editingCommentBody}
-                                                            onChange={e => setEditingCommentBody(e.target.value)}
-                                                            className="w-full p-2 border border-zinc-300 rounded text-sm outline-none focus:border-zinc-400"
-                                                            rows={2}
-                                                        />
-                                                        <div className="mt-2 flex gap-3 justify-end items-center">
-                                                            <button onClick={() => { setEditingCommentId(null); }} className="cursor-pointer text-zinc-400 hover:text-zinc-600 text-xs font-medium">Cancelar</button>
-                                                            <button onClick={() => handleSaveCommentEdit(com.id)} className="cursor-pointer bg-[#4db6ac] text-white px-3 py-1 rounded text-xs font-bold hover:bg-[#3ca398]">GUARDAR</button>
+                                                <div className="flex items-start gap-3">
+                                                    <UserAvatar username={com.author} size={30} />
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center gap-2 text-xs mb-2">
+                                                            <Link href={getProfileHref(com.author)} className="text-[#4db6ac] font-bold hover:underline">
+                                                                @{com.author?.replace('@', '')}
+                                                            </Link>
+                                                            <span className="text-zinc-400">{getRelativeTimeString(com.created_at)}</span>
                                                         </div>
-                                                    </div>
-                                                ) : (
-                                                    <React.Fragment>
-                                                        <p className="text-sm text-zinc-700 whitespace-pre-wrap">{com.body}</p>
-                                                        {isMyComment && (
-                                                            <div className="mt-3 flex gap-4 text-xs font-bold border-t border-zinc-100 pt-2">
-                                                                <button onClick={() => { setEditingCommentId(com.id); setEditingCommentBody(com.body); }} className="text-[#4db6ac] cursor-pointer hover:underline">Editar</button>
-                                                                <button onClick={() => handleDeleteCommentClick(com.id)} className="text-red-500 cursor-pointer hover:underline">Eliminar</button>
+                                                        {editingCommentId === com.id ? (
+                                                            <div>
+                                                                <textarea
+                                                                    value={editingCommentBody}
+                                                                    onChange={e => setEditingCommentBody(e.target.value)}
+                                                                    className="w-full p-2 border border-zinc-300 rounded text-sm outline-none focus:border-zinc-400"
+                                                                    rows={2}
+                                                                />
+                                                                <div className="mt-2 flex gap-3 justify-end items-center">
+                                                                    <button onClick={() => { setEditingCommentId(null); }} className="cursor-pointer text-zinc-400 hover:text-zinc-600 text-xs font-medium">Cancelar</button>
+                                                                    <button onClick={() => handleSaveCommentEdit(com.id)} className="cursor-pointer bg-[#4db6ac] text-white px-3 py-1 rounded text-xs font-bold hover:bg-[#3ca398]">GUARDAR</button>
+                                                                </div>
                                                             </div>
+                                                        ) : (
+                                                            <React.Fragment>
+                                                                <p className="text-sm text-zinc-700 whitespace-pre-wrap">{com.body}</p>
+                                                                {isMyComment && (
+                                                                    <div className="mt-3 flex gap-4 text-xs font-bold border-t border-zinc-100 pt-2">
+                                                                        <button onClick={() => { setEditingCommentId(com.id); setEditingCommentBody(com.body); }} className="text-[#4db6ac] cursor-pointer hover:underline">Editar</button>
+                                                                        <button onClick={() => handleDeleteCommentClick(com.id)} className="text-red-500 cursor-pointer hover:underline">Eliminar</button>
+                                                                    </div>
+                                                                )}
+                                                            </React.Fragment>
                                                         )}
-                                                    </React.Fragment>
-                                                )}
+                                                    </div>
+                                                </div>
                                             </div>
                                         );
                                     })}
@@ -660,19 +815,19 @@ export default function IssueDetailPage() {
                             <div key={attr.label} className="border-b border-zinc-100">
                                 <div className="flex justify-between items-center py-3 text-sm">
                                     <span className="text-zinc-400">{attr.label}</span>
-                                    <span
+                                    <button
                                         onClick={() => isCreator && setOpenPicker(isOpen ? null : attr.key)}
-                                        className={`font-semibold text-zinc-700 flex items-center gap-2 ${isCreator ? 'cursor-pointer hover:text-[#4db6ac] group' : ''}`}
+                                        className={`font-semibold text-zinc-700 flex items-center gap-2 ${isCreator ? 'cursor-pointer hover:text-[#4db6ac] group' : 'cursor-default'}`}
                                     >
-                                        <span
-                                            className="w-2 h-2 rounded-full inline-block flex-shrink-0"
-                                            style={{ backgroundColor: currentColor }}
-                                        />
+                        <span
+                            className="w-2 h-2 rounded-full inline-block shrink-0"
+                            style={{ backgroundColor: currentColor }}
+                        />
                                         {attr.currentName || 'None'}
                                         {isCreator && (
                                             <span className="text-zinc-300 group-hover:text-zinc-500 text-xs transition-colors">✎</span>
                                         )}
-                                    </span>
+                                    </button>
                                 </div>
 
                                 {isOpen && (
@@ -699,28 +854,28 @@ export default function IssueDetailPage() {
                                     value={deadlineInput}
                                     onChange={e => setDeadlineInput(e.target.value)}
                                     autoFocus
-                                    className="w-full bg-white border border-zinc-300 rounded px-2 py-1.5 text-sm outline-none focus:border-[#4db6ac]"
+                                    className="w-full bg-white border border-zinc-300 rounded px-2 py-1.5 text-sm outline-none focus:border-[#4db6ac] cursor-pointer"
                                 />
                                 <div className="flex gap-1.5 justify-end">
-                                    <button onClick={() => handleSaveDeadline(null)} className="text-zinc-400 hover:text-red-400 px-2 py-1 rounded text-xs font-medium">Clear date</button>
-                                    <button onClick={() => setIsEditingDeadline(false)} className="bg-zinc-200 text-zinc-600 px-2 py-1 rounded text-xs hover:bg-zinc-300">Cancel</button>
-                                    <button onClick={() => handleSaveDeadline(deadlineInput || null)} className="bg-[#4db6ac] text-white px-2 py-1 rounded text-xs font-bold hover:bg-[#3ca398]">Save</button>
+                                    <button type="button" onClick={() => handleSaveDeadline(null)} className="text-zinc-400 hover:text-red-400 px-2 py-1 rounded text-xs font-medium cursor-pointer">Clear date</button>
+                                    <button type="button" onClick={() => setIsEditingDeadline(false)} className="bg-zinc-200 text-zinc-600 px-2 py-1 rounded text-xs hover:bg-zinc-300 cursor-pointer">Cancel</button>
+                                    <button type="button" onClick={() => handleSaveDeadline(deadlineInput || null)} className="bg-[#4db6ac] text-white px-2 py-1 rounded text-xs font-bold hover:bg-[#3ca398] cursor-pointer">Save</button>
                                 </div>
                             </div>
                         ) : (
                             <div className="flex justify-between items-center">
                                 <span className="text-zinc-400">Deadline</span>
-                                <span
+                                <button
                                     onClick={() => {
                                         if (!isCreator) return;
                                         setDeadlineInput(issue.deadline ? new Date(issue.deadline).toISOString().split('T')[0] : '');
                                         setIsEditingDeadline(true);
                                     }}
-                                    className={`font-semibold text-zinc-700 flex items-center gap-1.5 ${isCreator ? 'cursor-pointer hover:text-[#4db6ac] group' : ''}`}
+                                    className={`font-semibold text-zinc-700 flex items-center gap-1.5 ${isCreator ? 'cursor-pointer hover:text-[#4db6ac] group' : 'cursor-default'}`}
                                 >
                                     {issue.deadline ? new Date(issue.deadline).toLocaleDateString('en-GB') : 'No date'}
                                     {isCreator && <span className="text-zinc-300 group-hover:text-zinc-500 text-xs transition-colors">✎</span>}
-                                </span>
+                                </button>
                             </div>
                         )}
                     </div>
@@ -728,9 +883,12 @@ export default function IssueDetailPage() {
                     {/* CREATOR */}
                     <div className="flex justify-between items-center py-3 border-b border-zinc-100 text-sm">
                         <span className="text-zinc-400">Creator</span>
-                        <span className="font-bold text-zinc-700">
+                        <Link
+                            href={getProfileHref(creatorName)}
+                            className="font-bold text-zinc-700 hover:text-[#4db6ac] hover:underline cursor-pointer"
+                        >
                             @{creatorName.replace('@', '')}
-                        </span>
+                        </Link>
                     </div>
 
                     {/* ASSIGNEE */}
@@ -741,7 +899,7 @@ export default function IssueDetailPage() {
                                 value={currentAssigneeValue}
                                 onChange={handleAssigneeSelectChange}
                                 disabled={isSavingAssignee}
-                                className="text-xs px-2 py-1.5 border border-zinc-200 rounded outline-none bg-zinc-50/50 text-zinc-700"
+                                className="text-xs px-2 py-1.5 border border-zinc-200 rounded outline-none bg-zinc-50/50 text-zinc-700 cursor-pointer disabled:cursor-not-allowed"
                             >
                                 <option value="">Unassigned</option>
                                 {AUTH_USERS.map((user) => (
@@ -749,16 +907,17 @@ export default function IssueDetailPage() {
                                 ))}
                             </select>
                             <button
+                                type="button"
                                 onClick={handleAssignToMe}
                                 disabled={!canAssignToMe || isSavingAssignee}
-                                className="bg-zinc-100 text-zinc-700 border border-zinc-300 hover:bg-zinc-200 text-xs font-bold px-2.5 py-1.5 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="bg-zinc-100 text-zinc-700 border border-zinc-300 hover:bg-zinc-200 text-xs font-bold px-2.5 py-1.5 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Assign to me
                             </button>
                             {assigneeMessage && (
                                 <span className={`text-[11px] ${assigneeMessage.isError ? 'text-red-500' : 'text-emerald-600'}`}>
-                                    {assigneeMessage.text}
-                                </span>
+                    {assigneeMessage.text}
+                </span>
                             )}
                         </div>
                     </div>
@@ -769,8 +928,9 @@ export default function IssueDetailPage() {
                             <span className="text-zinc-400">Tags</span>
                             {isCreator && (
                                 <button
+                                    type="button"
                                     onClick={() => setOpenPicker(openPicker === 'tags' ? null : 'tags')}
-                                    className="text-xs text-[#4db6ac] hover:underline font-medium"
+                                    className="text-xs text-[#4db6ac] hover:underline font-medium cursor-pointer"
                                 >
                                     + Add tag
                                 </button>
@@ -788,7 +948,7 @@ export default function IssueDetailPage() {
                                             onClick={() => handleAddTag(tag.id)}
                                             className="flex items-center gap-2.5 px-3 py-2 cursor-pointer text-sm hover:bg-zinc-50 text-zinc-700"
                                         >
-                                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color || '#cbd5e1' }} />
+                                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tag.color || '#cbd5e1' }} />
                                             <span>{tag.name}</span>
                                         </div>
                                     ))
@@ -811,15 +971,16 @@ export default function IssueDetailPage() {
                                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
                                     style={{ backgroundColor: tag.color || '#888' }}
                                 >
-                                    {tag.name}
+                    {tag.name}
                                     {isCreator && (
                                         <button
+                                            type="button"
                                             onClick={() => handleRemoveTag(tag.id)}
-                                            className="ml-0.5 hover:opacity-70 leading-none text-sm"
+                                            className="ml-0.5 hover:opacity-70 leading-none text-sm cursor-pointer"
                                             title="Remove tag"
                                         >×</button>
                                     )}
-                                </span>
+                </span>
                             ))}
                             {enrichedTags.length === 0 && (
                                 <span className="text-zinc-400 text-xs italic">No tags</span>
@@ -828,19 +989,59 @@ export default function IssueDetailPage() {
                     </div>
 
                     {/* WATCHERS */}
-                    <div className="mt-6 pt-4 border-t border-zinc-100">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3">WATCHERS ({currentWatchers.length})</h4>
-                        <div className="flex gap-1">
-                            <select className="flex-1 text-xs px-2 py-1.5 border border-zinc-200 rounded outline-none bg-zinc-50/50 text-zinc-600">
-                                <option>Add user...</option>
+                    <div className="mt-4 border-b border-zinc-100 pb-4">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3">
+                            WATCHERS ({issue.watchers?.length || 0})
+                        </h4>
+
+                        {/* Lista de watchers actuales */}
+                        <ul className="mb-4 flex flex-col gap-2">
+                            {issue.watchers?.map((watcher: string) => {
+                                return (
+                                    <li key={`${watcher}`} className="flex justify-between items-center text-sm bg-zinc-50 p-2 rounded border border-zinc-100">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-zinc-700 font-medium text-xs">@{watcher || 'unknown'}</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteWatcher(getUserIdByUsername(watcher) ?? 0)}
+                                            className="text-zinc-400 hover:text-red-500 font-bold transition-colors text-xs px-1 cursor-pointer"
+                                        >
+                                            ✕
+                                        </button>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+
+                        {/* Formulario selector */}
+                        <form onSubmit={handleAddWatcherSubmit} className="flex gap-1">
+                            <select
+                                name="user_id"
+                                value={selectedUserId}
+                                onChange={(e) => setSelectedUserId(e.target.value)}
+                                className="flex-1 bg-white border border-zinc-200 rounded text-xs p-2 outline-none focus:border-zinc-400 text-zinc-600 cursor-pointer"
+                            >
+                                <option value="">Add user...</option>
+                                {availableUsers.map((user) => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.username}
+                                    </option>
+                                ))}
                             </select>
-                            <button className="bg-zinc-100 text-zinc-600 border border-zinc-300 hover:bg-zinc-200 text-xs font-bold px-2.5 rounded">+</button>
-                        </div>
+                            <button
+                                type="submit"
+                                className="bg-zinc-100 text-zinc-700 border border-zinc-200 px-3 py-1.5 rounded text-sm font-bold hover:bg-zinc-200 active:bg-zinc-300 transition-colors cursor-pointer"
+                            >
+                                +
+                            </button>
+                        </form>
                     </div>
 
                     {isMyIssue && (
                         <div className="mt-8">
                             <button
+                                type="button"
                                 onClick={handleDeleteIssueClick}
                                 className="w-full py-2.5 bg-white text-red-500 border border-red-500 rounded font-bold text-xs tracking-wider uppercase transition-all hover:bg-red-500 hover:text-white cursor-pointer"
                             >

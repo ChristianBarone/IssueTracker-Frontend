@@ -1,17 +1,19 @@
 'use client';
 
+import Image from 'next/image'
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getFilteredIssues, IssueFilterState, IssueListResult } from './issueService';
+import {filterIssues, getIssues, IssueFilterState, updateIssueFields, IssueListResult} from './issueService';
 import { getStoredApiKey, getStoredUsername } from '../lib/auth';
 import { fetchEntities } from '../settings/settingsService';
+import { fetchProfile } from '../profile/profileService'
 
-interface IssueField {
+export interface IssueField {
     name: string;
     color?: string;
 }
 
-interface Issue {
+export interface Issue {
     id: number;
     subject: string;
     description: string | null;
@@ -22,6 +24,7 @@ interface Issue {
     assignee: string | null;
     deadline: string | null;
     modified_at: string | null;
+    creator: string | null;
 }
 
 interface BackendCounts {
@@ -29,6 +32,7 @@ interface BackendCounts {
 }
 
 export default function IssuesPage() {
+    const [rawIssues, setRawIssues] = useState<Issue[]>([])
     const [issues, setIssues] = useState<Issue[]>([]);
     const [totalCount, setTotalCount] = useState<number>(0);
     const [loading, setLoading] = useState<boolean>(true);
@@ -40,13 +44,13 @@ export default function IssuesPage() {
     const [severityCounts, setSeverityCounts] = useState<BackendCounts>({});
     const [priorityCounts, setPriorityCounts] = useState<BackendCounts>({});
     const [statusCounts, setStatusCounts] = useState<BackendCounts>({});
-    const [assignedToCounts, setAssignedToCounts] = useState<BackendCounts>({});
-    const [localStatusChanges, setLocalStatusChanges] = useState<Record<number, string>>({});
     const [statuses, setStatuses] = useState<Array<{ name: string; color?: string }>>([]);
+    const [assignedToCounts, setAssignedToCounts] = useState<BackendCounts>({});
+    const [userAvatars, setUserAvatars] = useState<Record<string, string | null>>({});
 
     const [filters, setFilters] = useState<IssueFilterState>({
         search: '',
-        order_by: '-created_at',
+        order_by: '-subject',
         issue_type: [],
         issue_severity: [],
         priority: [],
@@ -58,20 +62,46 @@ export default function IssuesPage() {
     const currentUser = getStoredUsername() ?? 'Andreu-Caro';
 
     const handleSort = (field: string) => {
-        setFilters(prev => {
-            const nextOrder = prev.order_by === field ? `-${field}` : field;
-            return { ...prev, order_by: nextOrder };
-        });
+        const newFilters = { ...filters, order_by: filters.order_by === field ? `-${field}` : field };
+        setFilters(newFilters);
+        setIssues(filterIssues(newFilters, rawIssues))
     };
+
+    const handleCheckboxChange = (category: keyof Omit<IssueFilterState, 'search' | 'order_by'>, value: string) => {
+        const currentList = filters[category];
+        const updatedList = currentList.includes(value)
+            ? currentList.filter(item => item !== value)
+            : [...currentList, value];
+
+        const newFilters = {...filters, [category]: updatedList}
+        setFilters(newFilters);
+        setIssues(filterIssues(newFilters, rawIssues))
+    };
+
+    const handleSearchChange = (query: string) => {
+        const newFilters = {...filters, search: query}
+        setFilters(newFilters)
+        setIssues(filterIssues(newFilters, rawIssues))
+    }
 
     const renderSortIcon = (field: string) => {
         const isCurrent = filters.order_by.replace('-', '') === field;
         const isDescending = filters.order_by.startsWith('-');
 
         return (
-            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', marginLeft: '6px', lineHeight: '0.6' }}>
-                <span style={{ fontSize: '9px', color: isCurrent && !isDescending ? '#34495e' : '#cbd5e1', marginBottom: '1px' }}>▲</span>
-                <span style={{ fontSize: '9px', color: isCurrent && isDescending ? '#34495e' : '#cbd5e1' }}>▼</span>
+            <div style={{
+                display: 'inline-flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                marginLeft: '6px',
+                lineHeight: '0.6'
+            }}>
+                <span style={{
+                    fontSize: '9px',
+                    color: isCurrent && !isDescending ? '#34495e' : '#cbd5e1',
+                    marginBottom: '1px'
+                }}>▲</span>
+                <span style={{fontSize: '9px', color: isCurrent && isDescending ? '#34495e' : '#cbd5e1'}}>▼</span>
             </div>
         );
     };
@@ -96,7 +126,7 @@ export default function IssuesPage() {
                 }
 
                 const currentFilters = JSON.parse(filtersString) as IssueFilterState;
-                const data: IssueListResult = await getFilteredIssues(currentFilters, apiKey);
+                const data: IssueListResult = await getIssues();
                 if (isMounted) {
                     if (data.error) {
                         setError(data.error);
@@ -115,11 +145,13 @@ export default function IssuesPage() {
                         assignee: issue.assignee ? String(issue.assignee) : null,
                         deadline: issue.deadline ? String(issue.deadline) : null,
                         modified_at: issue.modified_at ? String(issue.modified_at) : null,
+                        creator: issue.creator ? String(issue.creator) : null,
                         status: typeof issue.status === 'string'
-                            ? { name: issue.status }
-                            : ((issue.status as IssueField | null) || { name: 'In Progress' })
+                            ? {name: issue.status}
+                            : ((issue.status as IssueField | null) || {name: 'In Progress'})
                     }));
 
+                    setRawIssues(normalizedIssues);
                     setIssues(normalizedIssues);
                     setTotalCount(data.total_count || 0);
 
@@ -137,8 +169,10 @@ export default function IssuesPage() {
             }
         };
         loadIssues();
-        return () => { isMounted = false; };
-    }, [filtersString, refreshTrigger, apiKey]);
+        return () => {
+            isMounted = false;
+        };
+    }, [refreshTrigger]);
 
     useEffect(() => {
         let isMounted = true;
@@ -160,25 +194,29 @@ export default function IssuesPage() {
         };
 
         loadStatuses();
-        return () => { isMounted = false; };
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
-    const handleCheckboxChange = (category: keyof Omit<IssueFilterState, 'search' | 'order_by'>, value: string) => {
-        setFilters(prev => {
-            const currentList = prev[category] as string[];
-            const updatedList = currentList.includes(value)
-                ? currentList.filter(item => item !== value)
-                : [...currentList, value];
-            return { ...prev, [category]: updatedList };
-        });
+    const handleClearDeadline = async (issueId: number) => {
+        const success = await updateIssueFields(issueId, {deadline: ""});
+
+        if (success) {
+            setRefreshTrigger(prev => prev + 1);
+        } else {
+            alert("No se pudo limpiar la fecha límite en el servidor.");
+        }
     };
 
     const formatDate = (dateStr: string | null) => {
         if (!dateStr) return 'No date';
         const date = new Date(dateStr);
         if (Number.isNaN(date.getTime())) return dateStr;
-        return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        return date.toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'});
     };
+
+    const getProfileHref = (username: string) => `/profile/${encodeURIComponent(username.replace('@', '').trim())}`;
 
     const getStatusColor = (statusName: string | undefined): string => {
         if (!statusName) return '#CCCCCC';
@@ -198,132 +236,425 @@ export default function IssuesPage() {
 
     const getCountSafe = (countsObj: BackendCounts, key: string) => {
         if (!countsObj) return 0;
-        return countsObj[key] ?? (countsObj[key.toLowerCase()] !== undefined ? countsObj[key.toLowerCase()] : 0);
+        return countsObj[key] ?? (countsObj[key.toLowerCase()] === undefined ? 0 : countsObj[key.toLowerCase()]);
     };
 
-    return (
-        <div style={{ fontFamily: '"Ubuntu", "Segoe UI", sans-serif', color: '#34495e', padding: '20px', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
-            <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+    const normalizeUsername = (value: string | null) => value ? value.replace('@', '').trim() : ''
 
-                <header style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '25px' }}>
+    const getUserAvatar = (value: string) => userAvatars[normalizeUsername(value)] ?? null;
+
+    const UserAvatar = ({ username, size = 28 }: { username: string | null; size?: number }) => {
+        if (!username)
+            return <span className="text-[10px] leading-none">UN</span>
+
+        const avatarUrl = getUserAvatar(username);
+        const initials = normalizeUsername(username).slice(0, 2).toUpperCase() || 'U';
+
+        return (
+            <div
+                className="relative shrink-0 overflow-hidden rounded-full bg-zinc-500 text-white flex items-center justify-center font-bold uppercase"
+                style={{ width: size, height: size }}
+            >
+                {avatarUrl ? (
+                    <Image
+                        src={avatarUrl}
+                        alt={`Avatar of ${normalizeUsername(username)}`}
+                        fill
+                        unoptimized
+                        sizes={`${size}px`}
+                        className="object-cover"
+                    />
+                ) : (
+                    <span className="text-[10px] leading-none">{initials}</span>
+                )}
+            </div>
+        );
+    };
+
+    useEffect(() => {
+        const apiKey = getStoredApiKey();
+        if (!apiKey) return;
+
+        const usernames = new Set<string>();
+
+        rawIssues.forEach((issue) => {
+            const assignee = normalizeUsername(issue.assignee);
+            if (assignee.length > 0) usernames.add(assignee);
+        });
+
+        const missingUsernames = Array.from(usernames).filter((username) => userAvatars[username] === undefined);
+        if (missingUsernames.length === 0) return;
+
+        let cancelled = false;
+
+        const loadAvatars = async () => {
+            const results = await Promise.all(
+                missingUsernames.map(async (username) => {
+                    try {
+                        const profile = await fetchProfile(username);
+                        return [username, profile.avatar ?? null] as const;
+                    } catch {
+                        return [username, null] as const;
+                    }
+                })
+            );
+
+            if (cancelled) return;
+
+            setUserAvatars((prev) => {
+                const next = { ...prev };
+                results.forEach(([username, avatarUrl]) => {
+                    next[username] = avatarUrl;
+                });
+                return next;
+            });
+        };
+
+        void loadAvatars();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [rawIssues, userAvatars]);
+
+    return (
+        <div style={{
+            fontFamily: '"Ubuntu", "Segoe UI", sans-serif',
+            color: '#34495e',
+            padding: '20px',
+            backgroundColor: '#f8fafc',
+            minHeight: '100vh'
+        }}>
+            <div style={{maxWidth: '1400px', margin: '0 auto'}}>
+
+                <header style={{display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '25px'}}>
                     <button
                         onClick={() => setShowFilters(!showFilters)}
-                        style={{ padding: '10px 18px', backgroundColor: '#34495e', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' }}
+                        style={{
+                            padding: '10px 18px',
+                            backgroundColor: '#34495e',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontWeight: 'bold',
+                            fontSize: '13px',
+                            cursor: 'pointer'
+                        }}
                     >
                         FILTERS ▾
                     </button>
-                    <div style={{ position: 'relative', flexGrow: 1, maxWidth: '450px' }}>
+                    <div style={{position: 'relative', flexGrow: 1, maxWidth: '450px'}}>
                         <input
                             type="text"
                             placeholder="Search subject, description or ID..."
                             value={filters.search}
-                            onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                            style={{ width: '100%', padding: '10px 15px', border: '2px solid #e2e8f0', borderRadius: '5px', fontSize: '14px', outline: 'none' }}
+                            onChange={(e) => handleSearchChange(e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '10px 15px',
+                                border: '2px solid #e2e8f0',
+                                borderRadius: '5px',
+                                fontSize: '14px',
+                                outline: 'none'
+                            }}
                         />
                     </div>
-                    <Link href="/issues/new" style={{ marginLeft: 'auto' }}>
-                        <button style={{ padding: '10px 20px', backgroundColor: '#5dc5b5', color: '#fff', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer', boxShadow: '0 3px 0 #469b8e' }}>+ NEW ISSUE</button>
+                    <Link href="/issues/new" style={{marginLeft: 'auto'}}>
+                        <button style={{
+                            padding: '10px 20px',
+                            backgroundColor: '#5dc5b5',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '5px',
+                            fontWeight: 'bold',
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            boxShadow: '0 3px 0 #469b8e'
+                        }}>+ NEW ISSUE
+                        </button>
                     </Link>
                     <Link href="/issues/new-bulk">
-                        <button style={{ padding: '10px 18px', backgroundColor: '#d1d5db', color: '#374151', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #64748b', cursor: 'pointer' }}>BULK ADD</button>
+                        <button style={{
+                            padding: '10px 18px',
+                            backgroundColor: '#d1d5db',
+                            color: '#374151',
+                            border: 'none',
+                            borderRadius: '5px',
+                            fontWeight: 'bold',
+                            fontSize: '13px',
+                            boxShadow: '0 3px 0 #64748b',
+                            cursor: 'pointer'
+                        }}>BULK ADD
+                        </button>
                     </Link>
                     <Link href="/settings">
-                        <button style={{ padding: '10px 18px', backgroundColor: '#d1d5db', color: '#374151', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #64748b', cursor: 'pointer' }}>SETTINGS</button>
+                        <button style={{
+                            padding: '10px 18px',
+                            backgroundColor: '#d1d5db',
+                            color: '#374151',
+                            border: 'none',
+                            borderRadius: '5px',
+                            fontWeight: 'bold',
+                            fontSize: '13px',
+                            boxShadow: '0 3px 0 #64748b',
+                            cursor: 'pointer'
+                        }}>SETTINGS
+                        </button>
                     </Link>
-                    <Link href={`/profile/${encodeURIComponent(currentUser)}`} style={{ textDecoration: 'none' }}>
-                        <button style={{ padding: '10px 18px', backgroundColor: '#64748b', color: '#fff', border: 'none', borderRadius: '5px', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 0 #475569', cursor: 'pointer' }}>PROFILE</button>
+                    <Link href={`/profile/${encodeURIComponent(currentUser)}`} style={{textDecoration: 'none'}}>
+                        <button style={{
+                            padding: '10px 18px',
+                            backgroundColor: '#64748b',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '5px',
+                            fontWeight: 'bold',
+                            fontSize: '13px',
+                            boxShadow: '0 3px 0 #475569',
+                            cursor: 'pointer'
+                        }}>PROFILE
+                        </button>
                     </Link>
                 </header>
 
-                <div style={{ display: 'flex', gap: '25px', alignItems: 'flex-start' }}>
+                <div style={{display: 'flex', gap: '25px', alignItems: 'flex-start'}}>
                     {showFilters && (
-                        <aside style={{ width: '280px', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                        <aside style={{
+                            width: '280px',
+                            backgroundColor: '#fff',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            overflow: 'hidden'
+                        }}>
                             {error && (
-                                <div style={{ margin: '12px', padding: '12px 14px', borderRadius: '10px', border: '1px solid #fecaca', backgroundColor: '#fff1f2', color: '#be123c', fontSize: '13px', fontWeight: 600 }}>
+                                <div style={{
+                                    margin: '12px',
+                                    padding: '12px 14px',
+                                    borderRadius: '10px',
+                                    border: '1px solid #fecaca',
+                                    backgroundColor: '#fff1f2',
+                                    color: '#be123c',
+                                    fontSize: '13px',
+                                    fontWeight: 600
+                                }}>
                                     {error}
                                 </div>
                             )}
-                            <div style={{ padding: '15px', backgroundColor: '#edf2f7', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '13px' }}>
+                            <div style={{
+                                padding: '15px',
+                                backgroundColor: '#edf2f7',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                fontWeight: 'bold',
+                                fontSize: '13px'
+                            }}>
                                 <span>Filters ({totalCount})</span>
                             </div>
 
-                            <div style={{ padding: '10px' }}>
-                                <h4 style={{ padding: '5px 10px', fontSize: '13px', color: '#34495e', margin: '0' }}>Type</h4>
+                            <div style={{padding: '10px'}}>
+                                <h4 style={{
+                                    padding: '5px 10px',
+                                    fontSize: '13px',
+                                    color: '#34495e',
+                                    margin: '0'
+                                }}>Type</h4>
                                 {[
-                                    { name: 'Enhancement', color: '#40E4CE' },
-                                    { name: 'Bug', color: '#E44057' },
-                                    { name: 'Question', color: '#4070E4' }
+                                    {name: 'Enhancement', color: '#40E4CE'},
+                                    {name: 'Bug', color: '#E44057'},
+                                    {name: 'Question', color: '#4070E4'}
                                 ].map(t => (
-                                    <div key={t.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderLeft: `4px solid ${t.color}`, backgroundColor: '#fcfcfc', marginBottom: '2px' }}>
-                                        <label style={{ display: 'flex', alignItems: 'center', fontSize: '14px', gap: '8px', cursor: 'pointer', color: '#64748b', margin: 0 }}>
-                                            <input type="checkbox" checked={filters.issue_type.includes(t.name)} onChange={() => handleCheckboxChange('issue_type', t.name)} />
+                                    <div key={t.name} style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        padding: '8px 12px',
+                                        borderLeft: `4px solid ${t.color}`,
+                                        backgroundColor: '#fcfcfc',
+                                        marginBottom: '2px'
+                                    }}>
+                                        <label style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            fontSize: '14px',
+                                            gap: '8px',
+                                            cursor: 'pointer',
+                                            color: '#64748b',
+                                            margin: 0
+                                        }}>
+                                            <input type="checkbox" checked={filters.issue_type.includes(t.name)}
+                                                   onChange={() => handleCheckboxChange('issue_type', t.name)}/>
                                             {t.name}
                                         </label>
-                                        <span style={{ backgroundColor: '#ebf0f5', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>
+                                        <span style={{
+                                            backgroundColor: '#ebf0f5',
+                                            color: '#475569',
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: 'bold',
+                                            minWidth: '20px',
+                                            textAlign: 'center'
+                                        }}>
                                             {getCountSafe(typeCounts, t.name)}
                                         </span>
                                     </div>
                                 ))}
                             </div>
 
-                            <div style={{ padding: '10px' }}>
-                                <h4 style={{ padding: '5px 10px', fontSize: '13px', color: '#34495e', margin: '0' }}>Severity</h4>
+                            <div style={{padding: '10px'}}>
+                                <h4 style={{
+                                    padding: '5px 10px',
+                                    fontSize: '13px',
+                                    color: '#34495e',
+                                    margin: '0'
+                                }}>Severity</h4>
                                 {[
-                                    { name: 'Wishlist', color: '#70728F' },
-                                    { name: 'Minor', color: '#40A8E4' },
-                                    { name: 'Normal', color: '#40E4A8' },
-                                    { name: 'Important', color: '#E4A840' },
-                                    { name: 'Critical', color: '#E44057' }
+                                    {name: 'Wishlist', color: '#70728F'},
+                                    {name: 'Minor', color: '#40A8E4'},
+                                    {name: 'Normal', color: '#40E4A8'},
+                                    {name: 'Important', color: '#E4A840'},
+                                    {name: 'Critical', color: '#E44057'}
                                 ].map(s => (
-                                    <div key={s.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderLeft: `4px solid ${s.color}`, backgroundColor: '#fcfcfc', marginBottom: '2px' }}>
-                                        <label style={{ display: 'flex', alignItems: 'center', fontSize: '14px', gap: '8px', cursor: 'pointer', color: '#64748b', margin: 0 }}>
-                                            <input type="checkbox" checked={filters.issue_severity.includes(s.name)} onChange={() => handleCheckboxChange('issue_severity', s.name)} />
+                                    <div key={s.name} style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        padding: '8px 12px',
+                                        borderLeft: `4px solid ${s.color}`,
+                                        backgroundColor: '#fcfcfc',
+                                        marginBottom: '2px'
+                                    }}>
+                                        <label style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            fontSize: '14px',
+                                            gap: '8px',
+                                            cursor: 'pointer',
+                                            color: '#64748b',
+                                            margin: 0
+                                        }}>
+                                            <input type="checkbox" checked={filters.issue_severity.includes(s.name)}
+                                                   onChange={() => handleCheckboxChange('issue_severity', s.name)}/>
                                             {s.name}
                                         </label>
-                                        <span style={{ backgroundColor: '#ebf0f5', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>
+                                        <span style={{
+                                            backgroundColor: '#ebf0f5',
+                                            color: '#475569',
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: 'bold',
+                                            minWidth: '20px',
+                                            textAlign: 'center'
+                                        }}>
                                             {getCountSafe(severityCounts, s.name)}
                                         </span>
                                     </div>
                                 ))}
                             </div>
 
-                            <div style={{ padding: '10px' }}>
-                                <h4 style={{ padding: '5px 10px', fontSize: '13px', color: '#34495e', margin: '0' }}>Priority</h4>
+                            <div style={{padding: '10px'}}>
+                                <h4 style={{
+                                    padding: '5px 10px',
+                                    fontSize: '13px',
+                                    color: '#34495e',
+                                    margin: '0'
+                                }}>Priority</h4>
                                 {[
-                                    { name: 'Low', color: '#70728F' },
-                                    { name: 'Normal', color: '#E4A840' },
-                                    { name: 'High', color: '#E44057' }
+                                    {name: 'Low', color: '#70728F'},
+                                    {name: 'Normal', color: '#E4A840'},
+                                    {name: 'High', color: '#E44057'}
                                 ].map(p => (
-                                    <div key={p.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderLeft: `4px solid ${p.color}`, backgroundColor: '#fcfcfc', marginBottom: '2px' }}>
-                                        <label style={{ display: 'flex', alignItems: 'center', fontSize: '14px', gap: '8px', cursor: 'pointer', color: '#64748b', margin: 0 }}>
-                                            <input type="checkbox" checked={filters.priority.includes(p.name)} onChange={() => handleCheckboxChange('priority', p.name)} />
+                                    <div key={p.name} style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        padding: '8px 12px',
+                                        borderLeft: `4px solid ${p.color}`,
+                                        backgroundColor: '#fcfcfc',
+                                        marginBottom: '2px'
+                                    }}>
+                                        <label style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            fontSize: '14px',
+                                            gap: '8px',
+                                            cursor: 'pointer',
+                                            color: '#64748b',
+                                            margin: 0
+                                        }}>
+                                            <input type="checkbox" checked={filters.priority.includes(p.name)}
+                                                   onChange={() => handleCheckboxChange('priority', p.name)}/>
                                             {p.name}
                                         </label>
-                                        <span style={{ backgroundColor: '#ebf0f5', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>
+                                        <span style={{
+                                            backgroundColor: '#ebf0f5',
+                                            color: '#475569',
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: 'bold',
+                                            minWidth: '20px',
+                                            textAlign: 'center'
+                                        }}>
                                             {getCountSafe(priorityCounts, p.name)}
                                         </span>
                                     </div>
                                 ))}
                             </div>
 
-                            <div style={{ padding: '10px' }}>
-                                <h4 style={{ padding: '5px 10px', fontSize: '13px', color: '#34495e', margin: '0' }}>Status</h4>
+                            <div style={{padding: '10px'}}>
+                                <h4 style={{
+                                    padding: '5px 10px',
+                                    fontSize: '13px',
+                                    color: '#34495e',
+                                    margin: '0'
+                                }}>Status</h4>
                                 {statuses.map(st => (
-                                    <div key={st.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', backgroundColor: '#fcfcfc', marginBottom: '2px' }}>
-                                        <label style={{ display: 'flex', alignItems: 'center', fontSize: '14px', gap: '8px', cursor: 'pointer', color: '#64748b', margin: 0 }}>
-                                            <input type="checkbox" checked={filters.status.includes(st.name)} onChange={() => handleCheckboxChange('status', st.name)} />
+                                    <div key={st.name} style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        padding: '8px 12px',
+                                        backgroundColor: '#fcfcfc',
+                                        marginBottom: '2px'
+                                    }}>
+                                        <label style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            fontSize: '14px',
+                                            gap: '8px',
+                                            cursor: 'pointer',
+                                            color: '#64748b',
+                                            margin: 0
+                                        }}>
+                                            <input type="checkbox" checked={filters.status.includes(st.name)}
+                                                   onChange={() => handleCheckboxChange('status', st.name)}/>
                                             {st.name}
                                         </label>
-                                        <span style={{ backgroundColor: '#ebf0f5', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>
+                                        <span style={{
+                                            backgroundColor: '#ebf0f5',
+                                            color: '#475569',
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: 'bold',
+                                            minWidth: '20px',
+                                            textAlign: 'center'
+                                        }}>
                                             {getCountSafe(statusCounts, st.name)}
                                         </span>
                                     </div>
                                 ))}
                             </div>
 
-                            {/* AGREGADO: Sección de filtros visuales para "Assigned To" */}
-                            <div style={{ padding: '10px' }}>
-                                <h4 style={{ padding: '5px 10px', fontSize: '13px', color: '#34495e', margin: '0' }}>Assigned To</h4>
+                            <div style={{padding: '10px'}}>
+                                <h4 style={{
+                                    padding: '5px 10px',
+                                    fontSize: '13px',
+                                    color: '#34495e',
+                                    margin: '0'
+                                }}>Assigned To</h4>
                                 {[
                                     'Unassigned',
                                     'Andreu-Caro',
@@ -333,8 +664,24 @@ export default function IssuesPage() {
                                     'Christian-Alejandro-Barone',
                                     'adminUser'
                                 ].map(user => (
-                                    <div key={user} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', backgroundColor: '#fcfcfc', marginBottom: '2px', borderLeft: '4px solid #64748b' }}>
-                                        <label style={{ display: 'flex', alignItems: 'center', fontSize: '14px', gap: '8px', cursor: 'pointer', color: '#64748b', margin: 0 }}>
+                                    <div key={user} style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        padding: '8px 12px',
+                                        backgroundColor: '#fcfcfc',
+                                        marginBottom: '2px',
+                                        borderLeft: '4px solid #64748b'
+                                    }}>
+                                        <label style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            fontSize: '14px',
+                                            gap: '8px',
+                                            cursor: 'pointer',
+                                            color: '#64748b',
+                                            margin: 0
+                                        }}>
                                             <input
                                                 type="checkbox"
                                                 checked={filters.assigned_to.includes(user)}
@@ -342,7 +689,16 @@ export default function IssuesPage() {
                                             />
                                             {user}
                                         </label>
-                                        <span style={{ backgroundColor: '#ebf0f5', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', minWidth: '20px', textAlign: 'center' }}>
+                                        <span style={{
+                                            backgroundColor: '#ebf0f5',
+                                            color: '#475569',
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            fontWeight: 'bold',
+                                            minWidth: '20px',
+                                            textAlign: 'center'
+                                        }}>
                                             {getCountSafe(assignedToCounts, user)}
                                         </span>
                                     </div>
@@ -351,52 +707,126 @@ export default function IssuesPage() {
                         </aside>
                     )}
 
-                    <main style={{ flexGrow: 1, backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', overflow: 'hidden' }}>
+                    <main style={{
+                        flexGrow: 1,
+                        backgroundColor: 'white',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                        overflow: 'hidden'
+                    }}>
                         {loading ? (
-                            <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>Fetching issues...</div>
-                        ) : error ? (
-                            <div style={{ padding: '60px', textAlign: 'center', color: '#b91c1c' }}>{error}</div>
-                        ) : (
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <div style={{padding: '60px', textAlign: 'center', color: '#94a3b8'}}>Fetching
+                                issues...</div>
+                        ) : ''}
+
+                        {error ? (
+                            <div style={{padding: '60px', textAlign: 'center', color: '#b91c1c'}}>{error}</div>
+                        ) : ''}
+
+                        {!loading && !error ? (
+                            <table style={{width: '100%', borderCollapse: 'collapse'}}>
                                 <thead>
-                                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-                                    <th onClick={() => handleSort('issue_type')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <tr style={{backgroundColor: '#f8fafc', borderBottom: '1px solid #f1f5f9'}}>
+                                    <th onClick={() => handleSort('issue_type')} style={{
+                                        padding: '15px',
+                                        fontSize: '11px',
+                                        color: '#94a3b8',
+                                        width: '80px',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        userSelect: 'none'
+                                    }}>
+                                        <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                                             <span>TYPE</span>{renderSortIcon('issue_type')}
                                         </div>
                                     </th>
-                                    <th onClick={() => handleSort('issue_severity')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <th onClick={() => handleSort('issue_severity')} style={{
+                                        padding: '15px',
+                                        fontSize: '11px',
+                                        color: '#94a3b8',
+                                        width: '80px',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        userSelect: 'none'
+                                    }}>
+                                        <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                                             <span>SEV.</span>{renderSortIcon('issue_severity')}
                                         </div>
                                     </th>
-                                    <th onClick={() => handleSort('priority')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '80px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <th onClick={() => handleSort('priority')} style={{
+                                        padding: '15px',
+                                        fontSize: '11px',
+                                        color: '#94a3b8',
+                                        width: '80px',
+                                        textAlign: 'center',
+                                        cursor: 'pointer',
+                                        userSelect: 'none'
+                                    }}>
+                                        <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                                             <span>PRIO.</span>{renderSortIcon('priority')}
                                         </div>
                                     </th>
-                                    <th onClick={() => handleSort('subject')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                                    <th onClick={() => handleSort('subject')} style={{
+                                        padding: '15px',
+                                        fontSize: '11px',
+                                        color: '#94a3b8',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        userSelect: 'none'
+                                    }}>
+                                        <div style={{display: 'flex', alignItems: 'center'}}>
                                             <span>ISSUE</span>{renderSortIcon('subject')}
                                         </div>
                                     </th>
-                                    <th onClick={() => handleSort('status')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '160px', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                                    <th onClick={() => handleSort('status')} style={{
+                                        padding: '15px',
+                                        fontSize: '11px',
+                                        color: '#94a3b8',
+                                        width: '160px',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        userSelect: 'none'
+                                    }}>
+                                        <div style={{display: 'flex', alignItems: 'center'}}>
                                             <span>STATUS</span>{renderSortIcon('status')}
                                         </div>
                                     </th>
-                                    <th onClick={() => handleSort('assignee')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '180px', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                                    <th onClick={() => handleSort('assignee')} style={{
+                                        padding: '15px',
+                                        fontSize: '11px',
+                                        color: '#94a3b8',
+                                        width: '180px',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        userSelect: 'none'
+                                    }}>
+                                        <div style={{display: 'flex', alignItems: 'center'}}>
                                             <span>ASSIGNED TO</span>{renderSortIcon('assignee')}
                                         </div>
                                     </th>
-                                    <th onClick={() => handleSort('deadline')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '120px', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                                    <th onClick={() => handleSort('deadline')} style={{
+                                        padding: '15px',
+                                        fontSize: '11px',
+                                        color: '#94a3b8',
+                                        width: '120px',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        userSelect: 'none'
+                                    }}>
+                                        <div style={{display: 'flex', alignItems: 'center'}}>
                                             <span>DEADLINE</span>{renderSortIcon('deadline')}
                                         </div>
                                     </th>
-                                    <th onClick={() => handleSort('modified_at')} style={{ padding: '15px', fontSize: '11px', color: '#94a3b8', width: '120px', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                                    <th onClick={() => handleSort('modified_at')} style={{
+                                        padding: '15px',
+                                        fontSize: '11px',
+                                        color: '#94a3b8',
+                                        width: '120px',
+                                        textAlign: 'left',
+                                        cursor: 'pointer',
+                                        userSelect: 'none'
+                                    }}>
+                                        <div style={{display: 'flex', alignItems: 'center'}}>
                                             <span>MODIFIED</span>{renderSortIcon('modified_at')}
                                         </div>
                                     </th>
@@ -404,59 +834,168 @@ export default function IssuesPage() {
                                 </thead>
                                 <tbody>
                                 {issues.map((issue) => (
-                                        <tr key={issue.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                            <td style={{ padding: '18px 15px', textAlign: 'center' }}>
-                                                <span style={{ width: '12px', height: '12px', borderRadius: '50%', display: 'inline-block', backgroundColor: getTypeColor(issue.type) }} />
-                                            </td>
-                                            <td style={{ padding: '18px 15px', textAlign: 'center' }}>
-                                                <span style={{ width: '12px', height: '12px', borderRadius: '50%', display: 'inline-block', backgroundColor: getSeverityColor(issue.severity) }} />
-                                            </td>
-                                            <td style={{ padding: '18px 15px', textAlign: 'center' }}>
-                                                <span style={{ width: '12px', height: '12px', borderRadius: '50%', display: 'inline-block', backgroundColor: getPriorityColor(issue.priority) }} />
-                                            </td>
+                                    <tr key={issue.id} style={{borderBottom: '1px solid #f1f5f9'}}>
+                                        <td style={{padding: '18px 15px', textAlign: 'center'}}>
+                                            <span style={{
+                                                width: '12px',
+                                                height: '12px',
+                                                borderRadius: '50%',
+                                                display: 'inline-block',
+                                                backgroundColor: getTypeColor(issue.type)
+                                            }}/>
+                                        </td>
+                                        <td style={{padding: '18px 15px', textAlign: 'center'}}>
+                                            <span style={{
+                                                width: '12px',
+                                                height: '12px',
+                                                borderRadius: '50%',
+                                                display: 'inline-block',
+                                                backgroundColor: getSeverityColor(issue.severity)
+                                            }}/>
+                                        </td>
+                                        <td style={{padding: '18px 15px', textAlign: 'center'}}>
+                                            <span style={{
+                                                width: '12px',
+                                                height: '12px',
+                                                borderRadius: '50%',
+                                                display: 'inline-block',
+                                                backgroundColor: getPriorityColor(issue.priority)
+                                            }}/>
+                                        </td>
 
-                                            <td style={{ padding: '18px 15px', textAlign: 'left' }}>
-                                                <Link
-                                                    href={`/issues/${issue.id}`}
-                                                    style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
-                                                >
-                                                    <span style={{ color: '#ff8c00', fontWeight: 'bold', marginRight: '6px', cursor: 'pointer' }}>
+                                        <td style={{padding: '18px 15px', textAlign: 'left'}}>
+                                            <Link
+                                                href={`/issues/${issue.id}`}
+                                                style={{
+                                                    textDecoration: 'none',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                    <span style={{
+                                                        color: '#ff8c00',
+                                                        fontWeight: 'bold',
+                                                        marginRight: '6px',
+                                                        cursor: 'pointer'
+                                                    }}>
                                                         #{issue.id}
                                                     </span>
-                                                    <span style={{ color: '#34495e', fontWeight: '500', fontSize: '15px', cursor: 'pointer' }} onMouseEnter={(e) => e.currentTarget.style.color = '#5dc5b5'} onMouseLeave={(e) => e.currentTarget.style.color = '#34495e'}>
-                                                        {issue.subject}
-                                                    </span>
-                                                </Link>
-                                            </td>
+                                                <button style={{
+                                                    color: '#34495e',
+                                                    fontWeight: '500',
+                                                    fontSize: '15px',
+                                                    border: 'none',
+                                                    background: 'none',
+                                                    padding: 0,
+                                                    cursor: 'pointer'
+                                                }} onMouseEnter={(e) => e.currentTarget.style.color = '#5dc5b5'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.color = '#34495e'}>
+                                                    {issue.subject}
+                                                </button>
+                                            </Link>
+                                        </td>
 
-                                            <td style={{ padding: '18px 15px', textAlign: 'left' }}>
-                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#34495e' }}>
-                                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block', flexShrink: 0, backgroundColor: getStatusColor(issue.status?.name) }} />
+                                        <td style={{padding: '18px 15px', textAlign: 'left'}}>
+                                                <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    fontSize: '13px',
+                                                    color: '#34495e'
+                                                }}>
+                                                    <span style={{
+                                                        width: '8px',
+                                                        height: '8px',
+                                                        borderRadius: '50%',
+                                                        display: 'inline-block',
+                                                        flexShrink: 0,
+                                                        backgroundColor: getStatusColor(issue.status?.name)
+                                                    }}/>
                                                     {issue.status?.name || 'In Progress'}
                                                 </span>
-                                            </td>
+                                        </td>
 
-                                            <td style={{ padding: '18px 15px', textAlign: 'left' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                    <span style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#34495e', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold', marginRight: '8px' }}>
-                                                        {issue.assignee ? issue.assignee.slice(0, 2).toUpperCase() : '-'}
-                                                    </span>
-                                                    <span style={{ color: '#34495e', fontSize: '13px' }}>{issue.assignee || 'Unassigned'}</span>
+                                        <td style={{padding: '18px 15px', textAlign: 'left'}}>
+                                            <div style={{display: 'flex', alignItems: 'center'}}>
+                                                <UserAvatar username={issue.assignee} />
+                                                {issue.assignee && issue.assignee !== "Unassigned" ? (
+                                                    <Link
+                                                        href={getProfileHref(issue.assignee)}
+                                                        style={{
+                                                            color: '#34495e',
+                                                            fontSize: '13px',
+                                                            textDecoration: 'none',
+                                                            fontWeight: 500,
+                                                            marginLeft: '5px',
+                                                        }}
+                                                    >
+                                                        {issue.assignee}
+                                                    </Link>
+                                                ) : (
+                                                    <span style={{color: '#34495e', fontSize: '13px', marginLeft: '5px'}}>Unassigned</span>
+                                                )}
+                                            </div>
+                                        </td>
+
+                                        <td style={{
+                                            padding: '18px 15px',
+                                            color: '#94a3b8',
+                                            fontSize: '13px',
+                                            textAlign: 'left'
+                                        }}>
+                                            {issue.deadline ? (
+                                                <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                                                        <span style={{color: '#94a3b8', fontSize: '12px'}}>
+                                                            {formatDate(issue.deadline)}
+                                                        </span>
+
+                                                    {(() => {
+                                                        const cleanCreator = (issue.creator || '').replace('@', '').trim().toLowerCase();
+                                                        const cleanCurrentUser = (currentUser || '').replace('@', '').trim().toLowerCase();
+
+                                                        if (cleanCreator === cleanCurrentUser) {
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleClearDeadline(issue.id)}
+                                                                    className="btn-delete-deadline"
+                                                                    title="Clear deadline"
+                                                                    style={{
+                                                                        background: 'none',
+                                                                        border: 'none',
+                                                                        color: '#ff5f5f',
+                                                                        cursor: 'pointer',
+                                                                        padding: '0 2px',
+                                                                        fontSize: '12px',
+                                                                        lineHeight: 1
+                                                                    }}
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })()}
                                                 </div>
-                                            </td>
+                                            ) : (
+                                                <span style={{color: '#94a3b8', fontSize: '12px'}}>No date</span>
+                                            )}
+                                        </td>
 
-                                            <td style={{ padding: '18px 15px', color: '#94a3b8', fontSize: '13px', textAlign: 'left' }}>
-                                                {formatDate(issue.deadline)}
-                                            </td>
-
-                                            <td style={{ padding: '18px 15px', color: '#94a3b8', fontSize: '13px', textAlign: 'left' }}>
-                                                {formatDate(issue.modified_at)}
-                                            </td>
-                                        </tr>
+                                        <td style={{
+                                            padding: '18px 15px',
+                                            color: '#94a3b8',
+                                            fontSize: '13px',
+                                            textAlign: 'left'
+                                        }}>
+                                            {formatDate(issue.modified_at)}
+                                        </td>
+                                    </tr>
                                 ))}
                                 </tbody>
                             </table>
-                        )}
+                        ) : ''}
                     </main>
                 </div>
             </div>

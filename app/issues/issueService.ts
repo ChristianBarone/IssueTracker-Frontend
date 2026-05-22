@@ -1,5 +1,6 @@
 import { fetchWithTimeout } from "../lib/fetchWithTimeout";
-import { getApiBaseUrl } from "../lib/apiBaseUrl";
+import {getApiBaseUrl, getFormDataHeaders, getHeaders} from "../lib/apiBaseUrl";
+import {Issue, IssueField} from "@/app/issues/page";
 
 export interface IssueFilterState {
     search: string;
@@ -52,39 +53,67 @@ const STATUS_COLORS: Record<string, string> = {
     'Postponed': '#4070E4'
 };
 
-export async function getFilteredIssues(filters: IssueFilterState, apiKey: string): Promise<IssueListResult> {
+
+function orderIssues(parameter: string) {
+    let direction = 1
+    if (parameter.startsWith('-')) {
+        direction = -1
+        parameter = parameter.substring(1)
+    }
+    return function(a: any, b: any) {
+        if (parameter === "subject") {
+            if (a["id"] > b["id"]) return direction
+            if (a["id"] < b["id"]) return -1 * direction
+            return 0
+        } else if (parameter === "deadline") {
+            if (!a["deadline"] || a["deadline"] > b["deadline"]) return direction
+            if (!b["deadline"] || a["issue"] < b["issue"]) return -1 * direction
+            return 0
+        } else if (a[parameter]?.name) {
+            if (a[parameter].name > b[parameter].name) return direction
+            if (a[parameter].name < b[parameter].name) return -1 * direction
+            return 0
+        } else {
+            if (a[parameter] > b[parameter]) return direction
+            if (a[parameter] < b[parameter]) return -1 * direction
+            return 0
+        }
+    }
+}
+
+export function filterIssues(filters: IssueFilterState, issues: Issue[]) {
+    let filteredIssues: Issue[] = issues.slice()
+
+    if (filters.search.length > 0)
+        filteredIssues = filteredIssues.filter((issue) => issue.subject?.includes(filters.search) ||
+                                                                 issue.description?.includes(filters.search) ||
+                                                                 String(issue.id).includes(filters.search))
+
+    if (filters.issue_type.length > 0)
+        filteredIssues = filteredIssues.filter(issue => filters.issue_type.includes(issue.type?.name ?? ""))
+
+    if (filters.issue_severity.length > 0)
+        filteredIssues = filteredIssues.filter(issue => filters.issue_severity.includes(issue.severity?.name ?? ""))
+
+    if (filters.priority.length > 0)
+        filteredIssues = filteredIssues.filter(issue => filters.priority.includes(issue.priority ?? ""))
+
+    if (filters.status.length > 0)
+        filteredIssues = filteredIssues.filter(issue => filters.status.includes(issue.status?.name ?? ""))
+
+    if (filters.assigned_to.length > 0)
+        filteredIssues = filteredIssues.filter(issue => filters.assigned_to.includes(issue.assignee ?? "Unassigned"))
+
+    if (filters.order_by) filteredIssues.sort(orderIssues(filters.order_by))
+
+    return filteredIssues
+}
+
+export async function getIssues(): Promise<IssueListResult> {
     try {
-        const baseUrl = getApiBaseUrl();
-        const params = new URLSearchParams();
-        if (filters.search) params.append('search', filters.search);
-        if (filters.order_by) params.append('order_by', filters.order_by);
-
-        filters.issue_type.forEach(t => params.append('issue_type', t));
-        filters.issue_severity.forEach(s => params.append('issue_severity', s));
-        filters.priority.forEach(p => params.append('priority', p));
-        filters.status.forEach(st => params.append('status', st));
-        filters.assigned_to.forEach(a => {
-            let idToSend = a;
-
-            if (a === 'Andreu-Caro') idToSend = '3';
-            else if (a == 'adminUser') idToSend = '1'
-            else if (a === 'Marti-Piris') idToSend = '2';
-            else if (a === 'Hala-Alkhatib') idToSend = '4';
-            else if (a === 'Aleks-Shahverdyan') idToSend = '5';
-            else if (a === 'Christian-Alejandro-Barone') idToSend = '6';
-            else if (a === 'Unassigned') idToSend = 'unassigned'; // O como maneje Django los vacíos
-
-            params.append('assigned_to', idToSend);
-        });
-
-        const url = `${baseUrl}/issues/?${params.toString()}`;
-
-        const response = await fetchWithTimeout(url, {
+        const response = await fetchWithTimeout(`${getApiBaseUrl()}/issues/`, {
             method: 'GET',
-            headers: {
-                'Authorization': apiKey,
-                'Content-Type': 'application/json'
-            }
+            headers: getHeaders()
         });
 
         if (!response.ok) {
@@ -190,20 +219,33 @@ export async function getFilteredIssues(filters: IssueFilterState, apiKey: strin
     }
 }
 
-export async function updateIssueStatus(issueId: number, statusName: string, apiKey: string): Promise<boolean> {
+export async function createIssue(body: FormData) {
+    return await fetchWithTimeout(`${getApiBaseUrl()}/issues/`, {
+        method: 'POST',
+        headers: getFormDataHeaders(),
+        body: body
+    });
+}
+
+export async function createIssueBulk(list: string[]) {
+    return await fetch('https://issuetracker-ff8u.onrender.com/issues/bulk/', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({list})
+    });
+}
+
+export async function updateIssueFields(id: number, fields: Record<string, unknown>): Promise<boolean> {
     try {
         const baseUrl = getApiBaseUrl();
-        const response = await fetchWithTimeout(`${baseUrl}/issue/${issueId}/update-status/`, {
-            method: 'POST',
-            headers: {
-                'Authorization': apiKey,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ status: statusName })
+        const res = await fetchWithTimeout(`${baseUrl}/issues/${id}/`, {
+            method: 'PUT',
+            headers: getHeaders(),
+            body: JSON.stringify(fields),
         });
-        return response.ok || response.status === 302;
+        return res.ok;
     } catch (error) {
-        console.error("Error al actualizar estado en la API:", error);
+        console.error("Error updating issue:", error);
         return false;
     }
 }

@@ -1,17 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { redirect } from 'next/navigation';
+import {createIssueBulk} from "@/app/issues/issueService";
+import {useRouter} from "next/navigation";
 
 export default function CreateIssuePage() {
+    const router = useRouter();
+
     const [formData, setFormData] = useState({
         subjects: ''
     });
 
     const [loading, setLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState<{ text: string; isError: boolean } | null>(null);
-
-    const getApiKey = () => 'Mxk4bUdzGtId8imUNgVKHUiheNKT4AKl';
 
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setFormData({
@@ -20,7 +21,7 @@ export default function CreateIssuePage() {
         });
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.SubmitEvent) => {
         e.preventDefault();
         setLoading(true);
         setStatusMessage(null);
@@ -35,14 +36,7 @@ export default function CreateIssuePage() {
             let list = formData.subjects.split("\n")
             list = list.filter((s) => s.trim() !== "")
 
-            const response = await fetch('https://issuetracker-ff8u.onrender.com/issues/bulk/', {
-                method: 'POST',
-                headers: {
-                    'Authorization': getApiKey(),
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({list})
-            });
+            const response = await createIssueBulk(list)
 
             const data = await response.json().catch(() => ({}));
 
@@ -59,11 +53,11 @@ export default function CreateIssuePage() {
             setStatusMessage({ text: 'Backend connection error.', isError: true });
         } finally {
             setLoading(false);
-            redirect('/issues');
+            router.push('/issues');
         }
     };
     const handleCancel = () => {
-        redirect('/issues');
+        router.push('/issues');
     };
 
     return (

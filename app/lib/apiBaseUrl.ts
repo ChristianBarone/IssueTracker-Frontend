@@ -1,3 +1,5 @@
+import {getStoredApiKey} from "@/app/lib/auth";
+
 const ENV_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || '').trim();
 
 function trimTrailingSlash(value: string) {
@@ -18,3 +20,12 @@ export function getApiBaseUrl() {
 
   return 'https://issuetracker-ff8u.onrender.com';
 }
+
+export const getHeaders = () => ({
+  'Authorization': getStoredApiKey() ?? '',
+  'Content-Type': 'application/json',
+});
+
+export const getFormDataHeaders = () => ({
+  'Authorization': getStoredApiKey() ?? ''
+});
